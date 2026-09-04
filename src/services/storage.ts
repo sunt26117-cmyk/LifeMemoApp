@@ -23,6 +23,8 @@ import {
   initialThemes,
   initialTrends,
 } from './mockData';
+import { supabaseService } from './supabaseService';
+import { ensureUuid } from '../utils/uuidUtil';
 
 const STORAGE_KEYS = {
   MEMORIES: 'ai_recorder_memories',
@@ -75,10 +77,22 @@ export class AppStorage {
       items.unshift(item);
     }
     this.saveMemories(items);
+
+    // Background sync to Supabase
+    supabaseService.syncRecord('memories', 'upsert', item.id, {
+      id: ensureUuid(item.id),
+      title: item.title || null,
+      content: item.content,
+      tags: item.tags || [],
+      ai_summary: item.aiSummary || null,
+      related_media_ids: (item.relatedMediaIds || []).map(ensureUuid),
+      created_at: item.createdAt || new Date().toISOString(),
+    });
   }
   static deleteMemory(id: string): void {
     const items = this.getMemories().filter((m) => m.id !== id);
     this.saveMemories(items);
+    supabaseService.syncRecord('memories', 'delete', ensureUuid(id));
   }
 
   // Photos
@@ -97,10 +111,29 @@ export class AppStorage {
       items.unshift(item);
     }
     this.savePhotos(items);
+
+    // Background sync to Supabase
+    supabaseService.syncRecord('photos', 'upsert', item.id, {
+      id: ensureUuid(item.id),
+      local_path: item.localPath,
+      taken_at: item.takenAt || new Date().toISOString(),
+      ai_summary: item.aiSummary || null,
+      summary_confirmed: item.summaryConfirmed ?? false,
+      tags: item.tags || [],
+      related_memory_ids: (item.relatedMemoryIds || []).map(ensureUuid),
+      metadata: {
+        locationName: item.locationName || null,
+        latitude: item.latitude || null,
+        longitude: item.longitude || null,
+        ...(item.metadata || {}),
+      },
+      created_at: item.createdAt || new Date().toISOString(),
+    });
   }
   static deletePhoto(id: string): void {
     const items = this.getPhotos().filter((p) => p.id !== id);
     this.savePhotos(items);
+    supabaseService.syncRecord('photos', 'delete', ensureUuid(id));
   }
 
   // Notes
@@ -119,10 +152,21 @@ export class AppStorage {
       items.unshift(item);
     }
     this.saveNotes(items);
+
+    supabaseService.syncRecord('notes', 'upsert', item.id, {
+      id: ensureUuid(item.id),
+      title: item.title,
+      content: item.content,
+      ai_organized: item.tags ? JSON.stringify(item.tags) : null,
+      ai_status: item.isPinned ? 'pinned' : 'none',
+      created_at: item.createdAt || new Date().toISOString(),
+      updated_at: item.updatedAt || new Date().toISOString(),
+    });
   }
   static deleteNote(id: string): void {
     const items = this.getNotes().filter((n) => n.id !== id);
     this.saveNotes(items);
+    supabaseService.syncRecord('notes', 'delete', ensureUuid(id));
   }
 
   // Tasks
@@ -141,10 +185,30 @@ export class AppStorage {
       items.unshift(item);
     }
     this.saveTasks(items);
+
+    supabaseService.syncRecord('tasks', 'upsert', item.id, {
+      id: ensureUuid(item.id),
+      title: item.title,
+      description: item.description || '',
+      category: item.category,
+      priority: item.priority,
+      start_time: item.startTime || null,
+      due_time: item.dueTime || null,
+      reminder_time: item.reminderTime || null,
+      repeat_rule: item.repeatRule || '无',
+      estimated_minutes: item.estimatedMinutes || null,
+      status: item.status,
+      steps: item.steps || [],
+      source_reflection_id: item.sourceReflectionId ? ensureUuid(item.sourceReflectionId) : null,
+      feedback: item.feedback || {},
+      check_in_type_ids: item.checkInTypeId ? [ensureUuid(item.checkInTypeId)] : [],
+      created_at: item.createdAt || new Date().toISOString(),
+    });
   }
   static deleteTask(id: string): void {
     const items = this.getTasks().filter((t) => t.id !== id);
     this.saveTasks(items);
+    supabaseService.syncRecord('tasks', 'delete', ensureUuid(id));
   }
 
   // Reflections
@@ -163,10 +227,26 @@ export class AppStorage {
       items.unshift(item);
     }
     this.saveReflections(items);
+
+    supabaseService.syncRecord('reflections', 'upsert', item.id, {
+      id: ensureUuid(item.id),
+      event_description: item.eventDescription,
+      emotion: item.emotion || '平静',
+      action_taken: item.actionTaken || null,
+      result: item.result || null,
+      ai_summary: item.aiSummary || null,
+      related_memory_ids: (item.relatedMemoryIds || []).map(ensureUuid),
+      related_photo_ids: (item.relatedPhotoIds || []).map(ensureUuid),
+      related_task_ids: (item.relatedTaskIds || []).map(ensureUuid),
+      related_summary_ids: (item.relatedSummaryIds || []).map(ensureUuid),
+      is_user_confirmed: item.isUserConfirmed ?? false,
+      created_at: item.createdAt || new Date().toISOString(),
+    });
   }
   static deleteReflection(id: string): void {
     const items = this.getReflections().filter((r) => r.id !== id);
     this.saveReflections(items);
+    supabaseService.syncRecord('reflections', 'delete', ensureUuid(id));
   }
 
   // CheckInTypes
@@ -199,20 +279,32 @@ export class AppStorage {
     const existingIdx = items.findIndex((r) => r.date === date && r.typeId === type.id);
     if (existingIdx >= 0) {
       // remove
-      items.splice(existingIdx, 1);
+      const removed = items.splice(existingIdx, 1)[0];
       this.saveCheckInRecords(items);
+      if (removed) {
+        supabaseService.syncRecord('check_in_records', 'delete', ensureUuid(removed.id));
+      }
       return false;
     } else {
       // add
-      items.push({
-        id: `chk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      const newRecord: CheckInRecord = {
+        id: ensureUuid(),
         date,
         typeId: type.id,
         typeName: type.name,
         symbol: type.symbol,
         createdAt: new Date().toISOString(),
-      });
+      };
+      items.push(newRecord);
       this.saveCheckInRecords(items);
+      supabaseService.syncRecord('check_in_records', 'upsert', newRecord.id, {
+        id: newRecord.id,
+        date: newRecord.date,
+        type_id: ensureUuid(newRecord.typeId),
+        symbol_snapshot: newRecord.symbol,
+        label_snapshot: newRecord.typeName,
+        created_at: newRecord.createdAt,
+      });
       return true;
     }
   }

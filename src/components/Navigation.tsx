@@ -7,15 +7,21 @@ import {
   BookOpen,
   Settings,
   Plus,
+  Cloud,
+  CloudCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { supabaseService } from '../services/supabaseService';
 
 interface NavigationProps {
   onQuickAction: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
-  const { activeTab, setActiveTab, setSettingsOpen } = useApp();
+  const { activeTab, setActiveTab, setSettingsOpen, syncStatus } = useApp();
+
+  const isConfigured = supabaseService.isConfigured();
 
   const tabs = [
     { id: 'today', label: '今日', icon: CalendarDays },
@@ -33,8 +39,33 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
             忆
           </div>
           <div>
-            <h1 className="text-base font-semibold text-slate-800 leading-tight">
-              AI 生活记录系统
+            <h1 className="text-base font-semibold text-slate-800 leading-tight flex items-center gap-1.5">
+              <span>AI 生活记录系统</span>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                title={
+                  syncStatus.state === 'syncing'
+                    ? '正在与 Supabase 同步...'
+                    : isConfigured
+                    ? 'Supabase 云端已连接'
+                    : '本地单机模式（点击配置 Supabase）'
+                }
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-normal transition-colors ${
+                  syncStatus.state === 'syncing'
+                    ? 'bg-amber-100 text-amber-700'
+                    : isConfigured
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {syncStatus.state === 'syncing' ? (
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                ) : (
+                  <Cloud className="w-2.5 h-2.5" />
+                )}
+                <span>{syncStatus.state === 'syncing' ? '同步中' : isConfigured ? '云端' : '本地'}</span>
+              </button>
             </h1>
             <p className="text-xs text-slate-400">自律 · 洞察 · 闭环</p>
           </div>

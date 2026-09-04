@@ -1,0 +1,8 @@
+{
+	"appId": "com.liferecorder.app",
+	"appName": "AI生活记录系统",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}

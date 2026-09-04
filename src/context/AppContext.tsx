@@ -17,6 +17,8 @@ import {
 } from '../types';
 import { AppStorage } from '../services/storage';
 import { ChangeTaskStatusParams, executeTaskStatusTransition } from '../services/taskService';
+import { supabaseService, SyncStatus } from '../services/supabaseService';
+import { newUuid } from '../utils/uuidUtil';
 
 interface AppContextType {
   // Navigation
@@ -28,6 +30,11 @@ interface AppContextType {
   // Settings
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+
+  // Supabase Sync
+  syncStatus: SyncStatus;
+  uploadToSupabase: () => Promise<{ success: boolean; message: string; count: number }>;
+  pullFromSupabase: () => Promise<{ success: boolean; message: string }>;
 
   // Biometric / PIN
   isBiometricLocked: boolean;
@@ -99,6 +106,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [themes, setThemes] = useState<ThemeItem[]>(() => AppStorage.getThemes());
   const [summaries, setSummaries] = useState<Summary[]>(() => AppStorage.getSummaries());
 
+  // Supabase sync status state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    state: 'idle',
+    lastSyncedAt: localStorage.getItem('ai_recorder_supabase_last_sync'),
+    error: null,
+    itemCount: 0,
+  });
+
+  useEffect(() => {
+    const unsub = supabaseService.subscribe((status) => {
+      setSyncStatus(status);
+    });
+    return () => unsub();
+  }, []);
+
   // Listen to external/storage updates
   useEffect(() => {
     const handleStorageUpdate = () => {
@@ -116,6 +138,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('app_storage_updated', handleStorageUpdate);
     return () => window.removeEventListener('app_storage_updated', handleStorageUpdate);
   }, []);
+
+  // Upload all local data to Supabase
+  const uploadToSupabase = async () => {
+    const res = await supabaseService.uploadAll({
+      memories: AppStorage.getMemories(),
+      photos: AppStorage.getPhotos(),
+      notes: AppStorage.getNotes(),
+      tasks: AppStorage.getTasks(),
+      reflections: AppStorage.getReflections(),
+      checkInTypes: AppStorage.getCheckInTypes(),
+      checkInRecords: AppStorage.getCheckInRecords(),
+      trends: AppStorage.getTrends(),
+      themes: AppStorage.getThemes(),
+      summaries: AppStorage.getSummaries(),
+    });
+    return res;
+  };
+
+  // Pull all data from Supabase and merge/replace locally
+  const pullFromSupabase = async () => {
+    const res = await supabaseService.pullAll();
+    if (res.success && res.data) {
+      if (res.data.memories) {
+        AppStorage.saveMemories(res.data.memories);
+        setMemories(res.data.memories);
+      }
+      if (res.data.photos) {
+        AppStorage.savePhotos(res.data.photos);
+        setPhotos(res.data.photos);
+      }
+      if (res.data.notes) {
+        AppStorage.saveNotes(res.data.notes);
+        setNotes(res.data.notes);
+      }
+      if (res.data.tasks) {
+        AppStorage.saveTasks(res.data.tasks);
+        setTasks(res.data.tasks);
+      }
+      if (res.data.reflections) {
+        AppStorage.saveReflections(res.data.reflections);
+        setReflections(res.data.reflections);
+      }
+      if (res.data.checkInTypes) {
+        AppStorage.saveCheckInTypes(res.data.checkInTypes);
+        setCheckInTypes(res.data.checkInTypes);
+      }
+      if (res.data.checkInRecords) {
+        AppStorage.saveCheckInRecords(res.data.checkInRecords);
+        setCheckInRecords(res.data.checkInRecords);
+      }
+      if (res.data.trends) {
+        AppStorage.saveTrends(res.data.trends);
+        setTrends(res.data.trends);
+      }
+      if (res.data.themes) {
+        AppStorage.saveThemes(res.data.themes);
+        setThemes(res.data.themes);
+      }
+      if (res.data.summaries) {
+        AppStorage.saveSummaries(res.data.summaries);
+        setSummaries(res.data.summaries);
+      }
+    }
+    return { success: res.success, message: res.message };
+  };
 
   // Biometric methods
   const unlockBiometric = (pin: string) => {
@@ -144,7 +231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addMemory = (m: Omit<Memory, 'id' | 'createdAt'>): Memory => {
     const newM: Memory = {
       ...m,
-      id: `mem-${Date.now()}`,
+      id: newUuid(),
       createdAt: new Date().toISOString(),
     };
     AppStorage.upsertMemory(newM);
@@ -166,7 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addPhoto = (p: Omit<Photo, 'id' | 'createdAt'>): Photo => {
     const newP: Photo = {
       ...p,
-      id: `photo-${Date.now()}`,
+      id: newUuid(),
       createdAt: new Date().toISOString(),
     };
     AppStorage.upsertPhoto(newP);
@@ -189,7 +276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const now = new Date().toISOString();
     const newN: Note = {
       ...n,
-      id: `note-${Date.now()}`,
+      id: newUuid(),
       createdAt: now,
       updatedAt: now,
     };
@@ -213,7 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addTask = (t: Omit<Task, 'id' | 'createdAt'>): Task => {
     const newT: Task = {
       ...t,
-      id: `task-${Date.now()}`,
+      id: newUuid(),
       createdAt: new Date().toISOString(),
     };
     AppStorage.upsertTask(newT);
@@ -245,7 +332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addReflection = (r: Omit<Reflection, 'id' | 'createdAt'>): Reflection => {
     const newR: Reflection = {
       ...r,
-      id: `ref-${Date.now()}`,
+      id: newUuid(),
       createdAt: new Date().toISOString(),
     };
     AppStorage.upsertReflection(newR);
@@ -267,7 +354,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addCheckInType = (t: Omit<CheckInType, 'id' | 'createdAt'>): CheckInType => {
     const newT: CheckInType = {
       ...t,
-      id: `type-${Date.now()}`,
+      id: newUuid(),
       createdAt: new Date().toISOString(),
     };
     AppStorage.upsertCheckInType(newT);
@@ -289,7 +376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addSummary = (s: Omit<Summary, 'id' | 'createdAt'>): Summary => {
     const newS: Summary = {
       ...s,
-      id: `sum-${Date.now()}`,
+      id: newUuid(),
       createdAt: new Date().toISOString(),
     };
     AppStorage.upsertSummary(newS);
@@ -306,6 +393,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSubTab,
         settingsOpen,
         setSettingsOpen,
+        syncStatus,
+        uploadToSupabase,
+        pullFromSupabase,
         isBiometricLocked,
         unlockBiometric,
         lockBiometric,
