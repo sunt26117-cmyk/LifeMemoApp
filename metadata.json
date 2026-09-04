@@ -1,0 +1,6 @@
+{
+  "name": "AI 生活记录系统",
+  "description": "生活记录、打卡日历、任务管理、AI 反思与成长趋势分析系统",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

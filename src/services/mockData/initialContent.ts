@@ -1,0 +1,113 @@
+// src/services/mockData/initialContent.ts
+import { Memory, Note, Photo } from '../../types';
+
+export const initialMemories: Memory[] = [
+  {
+    id: 'mem-1',
+    title: '与客户沟通记录',
+    content: '今天与客户进行了深入沟通，讨论了项目需求、时间节点以及交付标准，双方达成初步共识，后续需要补充技术方案与验收标准。',
+    tags: ['沟通', '项目'],
+    aiSummary: '与客户达成初步共识，需补充技术方案与验收标准。',
+    relatedMediaIds: ['photo-1'],
+    createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: 'mem-2',
+    title: '学习笔记：状态管理与组件通信',
+    content: '复习了组件与全局状态的基本用法，记录了响应式更新的实现细节与常见坑，计划在下周的迭代中实践并优化状态管理。',
+    tags: ['学习'],
+    aiSummary: '复习状态管理，记录实现细节与待实践项。',
+    relatedMediaIds: [],
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'mem-3',
+    title: '项目回顾',
+    content: '回顾本次迭代发现沟通不及时导致需求反复，影响进度。建议下次明确验收标准并安排定期同步会议以减少误解。',
+    tags: ['沟通', '准备不足'],
+    aiSummary: '明确验收标准并建立例行同步以减少反复。',
+    relatedMediaIds: ['photo-2'],
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+  {
+    id: 'mem-4',
+    title: '晨间散步灵感',
+    content: '清晨在公园慢跑半小时，微风吹拂感觉神清气爽。把今天要做的事情在脑海里过了一遍，效率显著提升。',
+    tags: ['健康', '习惯'],
+    aiSummary: '晨跑恢复精力，梳理今日日程提升专注。',
+    relatedMediaIds: [],
+    createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+  },
+  {
+    id: 'mem-5',
+    title: '月度总结',
+    content: '本月完成多个里程碑，团队协作效率提升，但测试覆盖率与文档质量仍需改进，计划下月重点推进自动化测试与文档完善。',
+    tags: ['沟通', '项目'],
+    aiSummary: '完成里程碑，需提升测试覆盖率与文档质量，计划推进自动化测试。',
+    relatedMediaIds: [],
+    createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
+  },
+];
+
+export const initialPhotos: Photo[] = [
+  {
+    id: 'photo-1',
+    localPath: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=800&auto=format&fit=crop&q=80',
+    takenAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+    aiSummary: '白板上写着清晰的项目需求架构与交付甘特图',
+    summaryConfirmed: true,
+    tags: ['会议', '项目'],
+    relatedMemoryIds: ['mem-1'],
+    locationName: '创新工场会议室',
+    latitude: 39.984,
+    longitude: 116.31,
+    createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: 'photo-2',
+    localPath: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80',
+    takenAt: new Date(Date.now() - 86400000).toISOString(),
+    aiSummary: '书桌上放置着整洁的笔记本与刚画好的状态流转图草稿',
+    summaryConfirmed: true,
+    tags: ['学习', '灵感'],
+    relatedMemoryIds: ['mem-2'],
+    locationName: '家里书房',
+    latitude: 39.9,
+    longitude: 116.4,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'photo-3',
+    localPath: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
+    takenAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+    aiSummary: '清晨微光洒在绿意盎然的公园慢跑小径上',
+    summaryConfirmed: true,
+    tags: ['健康', '散步'],
+    relatedMemoryIds: ['mem-4'],
+    locationName: '朝阳公园林荫道',
+    latitude: 39.93,
+    longitude: 116.48,
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+];
+
+export const initialNotes: Note[] = [
+  {
+    id: 'note-1',
+    title: '下周技术评审备忘',
+    content: '1. 验证 V1~V5 校验规则边界\n2. 检查 TrendEngine 50 条 evidence 窗口\n3. 确认日历打卡权限控制',
+    tags: ['备忘', '工作'],
+    isPinned: true,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: 'note-2',
+    title: '随手灵感：生活习惯闭环',
+    content: '习惯打卡与具体任务结合，完成任务时自动同步打卡记录，形成完整的行为数据资产。',
+    tags: ['灵感', '思考'],
+    isPinned: false,
+    createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+];
