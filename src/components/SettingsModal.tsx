@@ -23,11 +23,18 @@ import {
   Sun,
   Coffee,
   Trees,
+  Sparkles,
+  Smile,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AppStorage } from '../services/storage';
 import { supabaseService } from '../services/supabaseService';
 import { AppTheme } from '../types';
+import {
+  mascotRepository,
+  getMascotTimeBucket,
+  TIME_BUCKET_META_MAP,
+} from '../features/spirit';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -64,6 +71,30 @@ export const SettingsModal: React.FC = () => {
   } | null>(null);
   const [syncingAction, setSyncingAction] = useState<string | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [mascotEnabled, setMascotEnabled] = useState(() => mascotRepository.isEnabled());
+  const [mascotToast, setMascotToast] = useState<string | null>(null);
+
+  const currentBucket = getMascotTimeBucket();
+  const bucketMeta = TIME_BUCKET_META_MAP[currentBucket];
+
+  const handleToggleMascot = (enabled: boolean) => {
+    mascotRepository.setEnabled(enabled);
+    setMascotEnabled(enabled);
+    window.dispatchEvent(new CustomEvent('mascot-toggle', { detail: { enabled } }));
+    setMascotToast(enabled ? '已启用陪伴小精灵' : '已关闭陪伴小精灵');
+    setTimeout(() => setMascotToast(null), 2000);
+  };
+
+  const handleTestGreeting = () => {
+    window.dispatchEvent(new CustomEvent('mascot-trigger-greeting'));
+    setSettingsOpen(false); // 关闭弹窗以便用户直接观看屏幕中央入场
+  };
+
+  const handleResetMascotCache = () => {
+    mascotRepository.resetGreetingCache();
+    setMascotToast('已重置频控缓存，下次冷启动或切回将触发完整问候');
+    setTimeout(() => setMascotToast(null), 2500);
+  };
 
   if (!settingsOpen) return null;
 
@@ -363,6 +394,87 @@ export const SettingsModal: React.FC = () => {
                 <span>添加分类</span>
               </button>
             </div>
+          </div>
+
+          {/* Section: In-App Mascot Companion */}
+          <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                <label className="text-xs font-semibold text-slate-800">
+                  应用内陪伴小精灵 (In-App Mascot)
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleToggleMascot(!mascotEnabled)}
+                  className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
+                    mascotEnabled ? 'bg-blue-600 justify-end' : 'bg-slate-300 justify-start'
+                  }`}
+                  title={mascotEnabled ? '点击停用小精灵' : '点击启用小精灵'}
+                >
+                  <span className="bg-white w-4 h-4 rounded-full shadow-md block" />
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+              纯应用内常驻元气伴侣。启动时提供温和分桶问候，闲暇时常驻顶栏微表情呼吸待机，支持轻触互动与自律鼓励。
+            </p>
+
+            {/* Current Bucket & Status Pill */}
+            <div className="bg-white/80 rounded-lg p-2.5 border border-blue-100 mb-3 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-base">✨</span>
+                <div>
+                  <div className="font-semibold text-slate-700 text-[11px]">
+                    当前时段：{bucketMeta.name} {bucketMeta.timeRange}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    时段特征：{bucketMeta.theme} · {bucketMeta.mood}
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                  currentBucket === 'lateNight'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {currentBucket === 'lateNight' ? '🌙 熟睡模式' : '🌞 活跃伴随'}
+              </span>
+            </div>
+
+            {/* Test and Cache Reset Actions */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleTestGreeting}
+                disabled={!mascotEnabled}
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[11px] font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+              >
+                <Smile className="w-3.5 h-3.5" />
+                <span>立即预览入场问候</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetMascotCache}
+                className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium rounded-lg flex items-center gap-1.5 transition-colors"
+                title="重置今天问候记录，便于测试冷启动"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>重置频控记录</span>
+              </button>
+            </div>
+
+            {mascotToast && (
+              <div className="mt-2 text-[10px] text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded-md font-medium">
+                {mascotToast}
+              </div>
+            )}
           </div>
 
           {/* Supabase Cloud Storage */}

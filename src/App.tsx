@@ -17,6 +17,7 @@ import { PhotoEditModal } from './components/PhotoEditModal';
 import { BiometricModal } from './components/BiometricModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PhotoFullscreenViewer } from './components/PhotoFullscreenViewer';
+import { MascotOverlayLayer } from './features/spirit';
 import { getThemeColors } from './utils/themeStyles';
 
 export const App: React.FC = () => {
@@ -187,6 +188,7 @@ export const App: React.FC = () => {
 
         <SettingsModal />
         <PhotoFullscreenViewer />
+        <MascotOverlayLayer theme={theme} />
       </div>
 
     </div>
