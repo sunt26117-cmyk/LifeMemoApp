@@ -16,10 +16,18 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Palette,
+  Tags,
+  Plus,
+  Trash2,
+  Sun,
+  Coffee,
+  Trees,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AppStorage } from '../services/storage';
 import { supabaseService } from '../services/supabaseService';
+import { AppTheme } from '../types';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -30,12 +38,21 @@ export const SettingsModal: React.FC = () => {
     syncStatus,
     uploadToSupabase,
     pullFromSupabase,
+    statAnchorDate,
+    resetCheckInsAndTrends,
+    theme,
+    setTheme,
+    taskCategories,
+    addTaskCategory,
+    removeTaskCategory,
+    resetTaskCategories,
   } = useApp();
 
   const [apiKey, setApiKey] = useState(() => AppStorage.getApiKey() || '');
   const [showApiKey, setShowApiKey] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
 
   // Supabase state
   const [supabaseConfig, setSupabaseConfig] = useState(() => supabaseService.getConfig());
@@ -49,6 +66,17 @@ export const SettingsModal: React.FC = () => {
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   if (!settingsOpen) return null;
+
+  const handleAddCategory = () => {
+    const trimmed = newCategoryInput.trim();
+    if (!trimmed) return;
+    if (taskCategories.includes(trimmed)) {
+      alert('该分类已存在');
+      return;
+    }
+    addTaskCategory(trimmed);
+    setNewCategoryInput('');
+  };
 
   const handleSaveApiKey = () => {
     AppStorage.setApiKey(apiKey.trim());
@@ -146,9 +174,197 @@ export const SettingsModal: React.FC = () => {
           <X className="w-4 h-4" />
         </button>
 
-        <h3 className="text-base font-semibold text-slate-800 mb-4">系统设置与云同步</h3>
+        <h3 className="text-base font-semibold text-slate-800 mb-4">系统设置与个人偏好</h3>
 
         <div className="space-y-5">
+          {/* Section 1: Visual Eye-care Theme (3 Options) */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Palette className="w-4 h-4 text-[#4A90D9]" />
+                <label className="text-xs font-semibold text-slate-800">
+                  视觉护眼主题配色 (3种风格可选)
+                </label>
+              </div>
+              <span className="text-[10px] text-slate-400">缓解视觉疲劳 · 随心切换</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+              为减少长时间记录与复盘时的眼部疲劳，特别调配了3套低刺激、高阅读舒适度的和谐配色：
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Sky Theme */}
+              <button
+                type="button"
+                onClick={() => setTheme('sky')}
+                className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                  theme === 'sky'
+                    ? 'border-[#4A90D9] bg-sky-50/60 shadow-xs ring-2 ring-[#4A90D9]/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1 text-xs font-semibold text-slate-800">
+                      <Sun className="w-3.5 h-3.5 text-[#4A90D9]" />
+                      <span>静谧晴空</span>
+                    </div>
+                    {theme === 'sky' && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#4A90D9]" />
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight mb-2">
+                    纯澈天空蓝，通透开阔，清爽理性
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#4A90D9] border border-white shadow-xs" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#7ED9B7] border border-white shadow-xs" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#F4F7FB] border border-slate-200" />
+                </div>
+              </button>
+
+              {/* Warm Theme */}
+              <button
+                type="button"
+                onClick={() => setTheme('warm')}
+                className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                  theme === 'warm'
+                    ? 'border-[#B86B35] bg-[#FBF8F2] shadow-xs ring-2 ring-[#B86B35]/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1 text-xs font-semibold text-[#5A381E]">
+                      <Coffee className="w-3.5 h-3.5 text-[#B86B35]" />
+                      <span>暖阳麦浪</span>
+                    </div>
+                    {theme === 'warm' && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#B86B35]" />
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight mb-2">
+                    柔和米杏纸质感，低蓝光刺激，久看不累
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#B86B35] border border-white shadow-xs" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#E6A86C] border border-white shadow-xs" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#F7F4EE] border border-slate-200" />
+                </div>
+              </button>
+
+              {/* Forest Theme */}
+              <button
+                type="button"
+                onClick={() => setTheme('forest')}
+                className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                  theme === 'forest'
+                    ? 'border-[#3B7D57] bg-[#F3F8F5] shadow-xs ring-2 ring-[#3B7D57]/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1 text-xs font-semibold text-[#204731]">
+                      <Trees className="w-3.5 h-3.5 text-[#3B7D57]" />
+                      <span>森意清幽</span>
+                    </div>
+                    {theme === 'forest' && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#3B7D57]" />
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-tight mb-2">
+                    鼠尾草与抹茶淡绿，平复焦躁，护眼怡神
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#3B7D57] border border-white shadow-xs" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#7EC29B] border border-white shadow-xs" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#F1F6F2] border border-slate-200" />
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Task Categories Management (Add / Delete / Personal Focus) */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Tags className="w-4 h-4 text-purple-600" />
+                <label className="text-xs font-semibold text-slate-800">
+                  生活待办任务分类管理
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('确定要恢复为推荐的个人生活默认分类吗？')) {
+                    resetTaskCategories();
+                  }
+                }}
+                className="text-[10px] text-purple-600 hover:underline font-medium"
+              >
+                恢复推荐分类
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-2.5 leading-relaxed">
+              支持自由增加或删减分类，专注个人私生活（如健康日常、个人学习、陪伴、理财等）。
+            </p>
+
+            {/* Existing Categories List */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {taskCategories.map((cat) => (
+                <span
+                  key={cat}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs group"
+                >
+                  <span>{cat}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (taskCategories.length <= 1) {
+                        alert('请至少保留一个任务分类');
+                        return;
+                      }
+                      removeTaskCategory(cat);
+                    }}
+                    className="text-slate-400 hover:text-rose-500 transition-colors p-0.5"
+                    title={`删除「${cat}」分类`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            {/* Add New Category Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newCategoryInput}
+                onChange={(e) => setNewCategoryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCategory();
+                  }
+                }}
+                placeholder="输入新分类名称 (如：健身运动、家庭生活、副业探究)"
+                className="flex-1 text-xs py-1.5 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-purple-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg flex items-center gap-1 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>添加分类</span>
+              </button>
+            </div>
+          </div>
+
           {/* Supabase Cloud Storage */}
           <div className="p-3.5 bg-emerald-50/50 rounded-xl border border-emerald-200/80">
             <div className="flex items-center justify-between mb-1.5">
@@ -382,6 +598,54 @@ export const SettingsModal: React.FC = () => {
                 {pinInput ? '设置' : hasPin ? '解除锁定' : '设置'}
               </button>
             </div>
+          </div>
+
+          {/* Module 1: Reset Check-Ins & Trends (Statistic Anchor) */}
+          <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200">
+            <div className="flex items-center justify-between mb-1.5">
+              <div>
+                <span className="text-xs font-bold text-amber-900 block">
+                  重置打卡与趋势 (统计锚点)
+                </span>
+                <span className="text-[10px] text-amber-700">
+                  当前锚点：{statAnchorDate ? `${statAnchorDate.slice(0, 10)} 00:00:00` : '未设置（计算全部）'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      '确定重置打卡日历和成长趋势吗？\n将清除当前打卡与趋势数据，并将统计锚点设置为今天 00:00:00，此前的历史数据将不再参与计算。'
+                    )
+                  ) {
+                    resetCheckInsAndTrends();
+                    alert('已重置打卡与趋势数据，统计锚点已锁定为今天！');
+                  }
+                }}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg shadow-xs"
+              >
+                重置打卡与趋势
+              </button>
+            </div>
+            <p className="text-[10px] text-amber-800 leading-relaxed">
+              重置后，打卡连续天数（Streak）、月度热力图与成长折线图将强制仅计算锚点后（当天起）的新数据。
+            </p>
+          </div>
+
+          {/* Module 3: Offload & Cloud Storage Overview */}
+          <div className="p-3 bg-sky-50/70 rounded-xl border border-sky-200">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-sky-900">
+                本地瘦身 (Offload) 状态
+              </span>
+              <span className="text-[11px] font-semibold text-[#4A90D9]">
+                已瘦身黑名单：{AppStorage.getOffloadedIds().length} 项
+              </span>
+            </div>
+            <p className="text-[10px] text-sky-800 leading-relaxed">
+              通过「本地瘦身」移除了本地大图和缓存的条目，云端仍安全备份。云端同步引擎已开启防回魂防御，绝不会将已瘦身数据重新灌入手机。
+            </p>
           </div>
 
           {/* Backup & Reset */}

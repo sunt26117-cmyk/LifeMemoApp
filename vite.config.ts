@@ -11,8 +11,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'AI 生活记录系统',
-        short_name: 'AI生活记录',
+        name: '人生不设限',
+        short_name: '人生不设限',
         description: '生活记录、打卡日历、任务管理、AI 反思与成长趋势分析系统',
         theme_color: '#4A90D9',
         background_color: '#F5F5F5',

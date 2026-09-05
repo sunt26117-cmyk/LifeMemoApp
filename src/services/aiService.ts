@@ -39,13 +39,20 @@ export class AiService {
             messages: [
               {
                 role: 'system',
-                content: `你是一个客观严谨的行为反思分析引擎。请根据用户提供的发生事实、行动与结果，严格输出 JSON 对象：
+                content: `你是一个客观严谨、富有洞察力的行为反思分析引擎。请根据用户提供的发生事实、行动与结果，输出结构化 JSON 对象。
+【核心规则】
+1. goodPoints（做得好的地方）：必须是客观积极、稳妥的事实。绝对禁止将不良习惯或失控行为（如熬夜、暴饮暴食、拖延、冲突争吵）误判为做得好的地方！如果用户记录的是挫折或负面行为，goodPoints 应当肯定其“正视问题、如实直面记录事实细节的态度”。
+2. keySuggestion（AI 关键建议）：提供 1-2 句短而精、直击本质的关键提点，指出用户在写反思时可能忽视的客观细节（如环境诱因、前置时间预估、生理精力规律等），帮助用户补充完善反思内容。
+3. nextSuggestion 与 suggestedTask：必须以动词白名单开头（制定/列出/写/记录/确认/设置/添加/使用/建立/执行/保存/检查/创建/安排/发送/准备/复习/更新/关闭/开启）且字数 ≥ 4 字。
+
+JSON 格式要求：
 {
   "eventSummary": "一句话客观事实摘要",
-  "goodPoints": "做得很稳妥具体的事实点",
+  "goodPoints": "做得很稳妥具体的事实点（严禁肯定负面习惯）",
   "ignoredFactors": "未考虑或被忽视的客观因素",
   "improvementPoints": "可量化执行的改善点",
-  "nextSuggestion": "动词开头的下一阶段具体行动建议",
+  "keySuggestion": "短而精的关键建议与盲点提点（1-2句）",
+  "nextSuggestion": "动词开头的具体改善行动建议",
   "suggestedTask": "动词开头的具体可执行待办任务，或 null",
   "citations": {
     "memoryIds": [],
@@ -87,7 +94,7 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
       }
     }
 
-    // Heuristic compliant generator (guaranteed to pass V1-V5)
+    // Heuristic compliant generator (guaranteed to pass V1-V5 with semantic domain intelligence)
     const fallbackSummary = this.generateCompliantFallback(params);
     return { summary: fallbackSummary, isFallback: true };
   }
@@ -103,20 +110,61 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
     const photoIds = params.contextPack.photos.slice(0, 1).map((p) => p.id);
 
     const eventSnippet = params.eventDescription.trim().slice(0, 30);
-    const actionSnippet = params.actionTaken?.trim() || '按计划推进事项';
-    const resultSnippet = params.result?.trim() || '达成阶段性目标';
+    const fullText = `${params.eventDescription} ${params.actionTaken || ''} ${params.result || ''} ${params.emotion || ''}`;
 
+    // Domain 1: 作息 / 睡眠 / 熬夜 / 疲惫 / 健康
+    if (/熬夜|晚睡|睡不着|失眠|没睡|起不来|困|精力差|疲惫|作息/.test(fullText)) {
+      return {
+        eventSummary: `记录了关于「${eventSnippet}」的作息事实与身心反应`,
+        goodPoints: '能够正视并如实记录当前作息与精力的偏差事实，未作遮掩',
+        ignoredFactors: '忽视了夜间持续受高刺激源（如手机屏幕/强光/持续用脑）对生物钟褪黑素分泌的生理抑制，未设立物理就寝缓冲点',
+        improvementPoints: '设立固定的睡前下线准备清单，提前30分钟停止处理高认知负荷事项',
+        keySuggestion: '关注导致延迟就寝的具体环境诱因（如短视频、工作沟通），提前建立睡前物理断联屏障，评估次日精力折损对核心目标的实际影响。',
+        nextSuggestion: '设置晚间固定断网闹钟并提前关闭屏幕',
+        suggestedTask: '设置23点手机睡眠勿扰模式',
+        citations: { memoryIds, photoIds },
+      };
+    }
+
+    // Domain 2: 拖延 / 效率 / 时间 / 走神 / 分心
+    if (/拖延|没完成|耽误|效率低|走神|分心|手机|刷|迟到|来不及/.test(fullText)) {
+      return {
+        eventSummary: `记录了关于「${eventSnippet}」的时间分配与执行过程`,
+        goodPoints: '对当下的时间流逝与产出偏差保持了清醒的自我觉察与复盘记录',
+        ignoredFactors: '事前低估了启动阶段的心理摩擦力，且未将庞大任务拆分为即刻可做的微小切片',
+        improvementPoints: '采用5分钟起步法降低行动门槛，隔绝干扰源并锁定单一交付目标',
+        keySuggestion: '识别诱发分心的具体瞬间与环境弱点，尝试把复杂事项拆解为第一眼就能动手的无阻力步骤。',
+        nextSuggestion: '列出启动该任务所需的最小第一步动作',
+        suggestedTask: '创建25分钟单任务专注倒计时',
+        citations: { memoryIds, photoIds },
+      };
+    }
+
+    // Domain 3: 情绪 / 焦虑 / 愤怒 / 冲突 / 压力
+    if (/焦虑|愤怒|生气|争吵|吵架|难过|委屈|冲突|崩溃|压抑|压力/.test(fullText)) {
+      return {
+        eventSummary: `记录了关于「${eventSnippet}」的情绪触发与反应经过`,
+        goodPoints: '如实记录了情绪波动时的生理反应与客观事件，做到了及时情绪留痕',
+        ignoredFactors: '在情绪上涌时未能预留3秒暂停缓冲，受即时防御心理驱动做出了本能反应',
+        improvementPoints: '遇到波动时优先进行物理抽离与深呼吸，区分客观事实与主观推断',
+        keySuggestion: '将关注点从无法控制的他人反应转移到自己能够掌控的最小行动上，厘清事实与主观猜想的界限。',
+        nextSuggestion: '记录引发波动的3个客观事实依据',
+        suggestedTask: '确认情绪平复后再推进沟通',
+        citations: { memoryIds, photoIds },
+      };
+    }
+
+    // Domain 4: 通用兜底
+    const actionSnippet = params.actionTaken?.trim() || '按计划推进事项';
     return {
       eventSummary: `记录了关于「${eventSnippet}」的事实经过与关键行动`,
-      goodPoints: `执行了明确行动：${actionSnippet}`,
-      ignoredFactors: '事前未充分预估各阶段时间分配与交接节点',
-      improvementPoints: `梳理后续交付细节，针对「${resultSnippet}」明确量化衡量指标`,
+      goodPoints: '保留了第一手客观事实经过，为后续迭代沉淀了真实依据',
+      ignoredFactors: '事前未充分预估外部环境变动对推进节奏的客观制约',
+      improvementPoints: '细化关键阶段的衡量指标与预期交付标准，留足缓冲余量',
+      keySuggestion: '审视过程中消耗精力最多的非核心环节，明确下次遇到同类情境时的核心应对原则。',
       nextSuggestion: '制定详细执行方案与验收核对清单',
-      suggestedTask: '安排复盘会议并确认后续交付时间表',
-      citations: {
-        memoryIds,
-        photoIds,
-      },
+      suggestedTask: '确认下一阶段的核心推进清单',
+      citations: { memoryIds, photoIds },
     };
   }
 

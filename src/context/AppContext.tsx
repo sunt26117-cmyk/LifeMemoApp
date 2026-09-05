@@ -1,6 +1,7 @@
 // src/context/AppContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  AppTheme,
   CancelType,
   CheckInRecord,
   CheckInType,
@@ -81,6 +82,64 @@ interface AppContextType {
 
   summaries: Summary[];
   addSummary: (s: Omit<Summary, 'id' | 'createdAt'>) => Summary;
+
+  // Refactor Module 1: Reset & Anchor
+  statAnchorDate: string | null;
+  resetCheckInsAndTrends: () => void;
+
+  // Refactor Module 3: Dual-Track Delete & Offload
+  offloadItem: (
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries',
+    id: string
+  ) => void;
+  permanentDeleteItem: (
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries',
+    id: string
+  ) => void;
+  restoreItem: (
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries',
+    item: any
+  ) => void;
+
+  // 1-Second Praise Toast
+  praiseToast: string | null;
+  showPraise: (msg: string) => void;
+
+  // Dynamic Task Categories (偏向个人私生活 & 自由增删)
+  taskCategories: string[];
+  addTaskCategory: (name: string) => boolean;
+  deleteTaskCategory: (name: string) => void;
+  removeTaskCategory: (name: string) => void;
+  resetTaskCategories: () => void;
+
+  // Visual Theme (3种风格：静谧晴空、暖阳麦浪、森意清幽)
+  theme: AppTheme;
+  setTheme: (t: AppTheme) => void;
+
+  // Fullscreen Photo Viewer (点击照片全屏查看)
+  photoPreview: { url: string; title?: string } | null;
+  openPhotoPreview: (url: string, title?: string) => void;
+  closePhotoPreview: () => void;
+}
+
+
+const CATEGORY_PRAISES: Record<string, string> = {
+  运动: '自律爆发！身体正在感谢你的每一次挥汗💪',
+  健康: '身心愉悦！每一个健康举动都在为你充电🌿',
+  学习: '思维精进！每一分专注都在沉淀智慧📚',
+  项目: '推进迅速！离既定目标又近了一大步🚀',
+  规划: '条理清晰！笃定掌控自己的人生节奏🧭',
+  习惯: '好习惯+1！稳步前行就是最快的方式✨',
+  情绪: '从容平和！敏锐觉察让你更有力量🌊',
+  沟通: '同频共振！高质量沟通连接无限可能💬',
+  散步: '脚步轻盈！在放松中重获清晰灵感🚶',
+  早起: '晨光作伴！元气满满开启新的一天☀️',
+  阅读: '见识深远！书籍是拓宽边界的阶梯📖',
+  冥想: '心神合一！静谧中蕴含无限生机🧘',
+};
+
+export function getCategoryPraise(categoryOrType: string): string {
+  return CATEGORY_PRAISES[categoryOrType] || '笃定前行！点滴微小的坚持正在汇聚成光✨';
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -105,6 +164,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [trends, setTrends] = useState<Trend[]>(() => AppStorage.getTrends());
   const [themes, setThemes] = useState<ThemeItem[]>(() => AppStorage.getThemes());
   const [summaries, setSummaries] = useState<Summary[]>(() => AppStorage.getSummaries());
+  const [statAnchorDate, setStatAnchorDate] = useState<string | null>(() =>
+    AppStorage.getStatAnchorDate()
+  );
+
+  // 1-second praise toast state (transient, no persistence)
+  const [praiseToast, setPraiseToast] = useState<string | null>(null);
+
+  const showPraise = (msg: string) => {
+    setPraiseToast(msg);
+    setTimeout(() => {
+      setPraiseToast((cur) => (cur === msg ? null : cur));
+    }, 1000);
+  };
+
+  // Dynamic Task Categories
+  const [taskCategories, setTaskCategories] = useState<string[]>(() =>
+    AppStorage.getTaskCategories()
+  );
+  const addTaskCategory = (name: string) => {
+    const ok = AppStorage.addTaskCategory(name);
+    if (ok) setTaskCategories(AppStorage.getTaskCategories());
+    return ok;
+  };
+  const deleteTaskCategory = (name: string) => {
+    AppStorage.deleteTaskCategory(name);
+    setTaskCategories(AppStorage.getTaskCategories());
+  };
+  const resetTaskCategories = () => {
+    AppStorage.resetTaskCategories();
+    setTaskCategories(AppStorage.getTaskCategories());
+  };
+
+  // Visual Theme
+  const [theme, setThemeState] = useState<AppTheme>(() => AppStorage.getAppTheme());
+  const setTheme = (t: AppTheme) => {
+    AppStorage.setAppTheme(t);
+    setThemeState(t);
+  };
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, [theme]);
+
+  // Fullscreen Photo Viewer
+  const [photoPreview, setPhotoPreview] = useState<{ url: string; title?: string } | null>(null);
+  const openPhotoPreview = (url: string, title?: string) => setPhotoPreview({ url, title });
+  const closePhotoPreview = () => setPhotoPreview(null);
 
   // Supabase sync status state
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
@@ -118,6 +226,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsub = supabaseService.subscribe((status) => {
       setSyncStatus(status);
     });
+    // Trigger 48-hour periodic reconciliation silently on mount
+    supabaseService.reconcile48Hours().catch(() => {});
     return () => unsub();
   }, []);
 
@@ -134,10 +244,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTrends(AppStorage.getTrends());
       setThemes(AppStorage.getThemes());
       setSummaries(AppStorage.getSummaries());
+      setStatAnchorDate(AppStorage.getStatAnchorDate());
+      setTaskCategories(AppStorage.getTaskCategories());
+      setThemeState(AppStorage.getAppTheme());
     };
     window.addEventListener('app_storage_updated', handleStorageUpdate);
     return () => window.removeEventListener('app_storage_updated', handleStorageUpdate);
   }, []);
+
 
   // Upload all local data to Supabase
   const uploadToSupabase = async () => {
@@ -319,12 +433,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const changeTaskStatus = (params: ChangeTaskStatusParams) => {
+    const targetTask = tasks.find((t) => t.id === params.taskId);
     const result = executeTaskStatusTransition(params, tasks, checkInTypes);
     if (result) {
       setTasks(AppStorage.getTasks());
       setCheckInRecords(AppStorage.getCheckInRecords());
       setTrends(AppStorage.getTrends());
       setThemes(AppStorage.getThemes());
+
+      if (params.newStatus === '已完成') {
+        showPraise(getCategoryPraise(targetTask?.category || '完成任务'));
+      }
     }
   };
 
@@ -368,8 +487,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleCheckIn = (date: string, type: CheckInType) => {
+    const isCurrentlyChecked = checkInRecords.some(
+      (r) => r.date === date && r.typeId === type.id
+    );
     AppStorage.toggleCheckIn(date, type);
     setCheckInRecords(AppStorage.getCheckInRecords());
+
+    // Trigger short encouragement toast when checked ON
+    if (!isCurrentlyChecked) {
+      showPraise(getCategoryPraise(type.name));
+    }
   };
 
   // Summary operations
@@ -382,6 +509,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     AppStorage.upsertSummary(newS);
     setSummaries(AppStorage.getSummaries());
     return newS;
+  };
+
+  // Refactor Module 1: Reset Check-in & Trends Anchor
+  const resetCheckInsAndTrends = () => {
+    AppStorage.resetCheckInsAndTrends();
+    setCheckInRecords(AppStorage.getCheckInRecords());
+    setTrends(AppStorage.getTrends());
+    setThemes(AppStorage.getThemes());
+    setSummaries(AppStorage.getSummaries());
+    setStatAnchorDate(AppStorage.getStatAnchorDate());
+  };
+
+
+  // Refactor Module 3: Dual-Track Delete & Offload
+  const offloadItem = (
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries',
+    id: string
+  ) => {
+    AppStorage.offloadItem(collection, id);
+    // Refresh states
+    if (collection === 'memories') setMemories(AppStorage.getMemories());
+    if (collection === 'photos') setPhotos(AppStorage.getPhotos());
+    if (collection === 'notes') setNotes(AppStorage.getNotes());
+    if (collection === 'tasks') setTasks(AppStorage.getTasks());
+    if (collection === 'reflections') setReflections(AppStorage.getReflections());
+    if (collection === 'summaries') setSummaries(AppStorage.getSummaries());
+  };
+
+  const permanentDeleteItem = (
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries',
+    id: string
+  ) => {
+    AppStorage.permanentDeleteItem(collection, id);
+    if (collection === 'memories') setMemories(AppStorage.getMemories());
+    if (collection === 'photos') setPhotos(AppStorage.getPhotos());
+    if (collection === 'notes') setNotes(AppStorage.getNotes());
+    if (collection === 'tasks') setTasks(AppStorage.getTasks());
+    if (collection === 'reflections') setReflections(AppStorage.getReflections());
+    if (collection === 'summaries') setSummaries(AppStorage.getSummaries());
+  };
+
+  const restoreItem = (
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries',
+    item: any
+  ) => {
+    AppStorage.restoreItem(collection, item);
+    if (collection === 'memories') setMemories(AppStorage.getMemories());
+    if (collection === 'photos') setPhotos(AppStorage.getPhotos());
+    if (collection === 'notes') setNotes(AppStorage.getNotes());
+    if (collection === 'tasks') setTasks(AppStorage.getTasks());
+    if (collection === 'reflections') setReflections(AppStorage.getReflections());
+    if (collection === 'summaries') setSummaries(AppStorage.getSummaries());
   };
 
   return (
@@ -431,7 +610,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         themes,
         summaries,
         addSummary,
+        statAnchorDate,
+        resetCheckInsAndTrends,
+        offloadItem,
+        permanentDeleteItem,
+        restoreItem,
+        praiseToast,
+        showPraise,
+        taskCategories,
+        addTaskCategory,
+        deleteTaskCategory,
+        removeTaskCategory: deleteTaskCategory,
+        resetTaskCategories,
+        theme,
+        setTheme,
+        photoPreview,
+        openPhotoPreview,
+        closePhotoPreview,
       }}
+
     >
       {children}
     </AppContext.Provider>

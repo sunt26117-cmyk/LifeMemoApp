@@ -1,6 +1,13 @@
 // src/components/ReflectionEditModal.tsx
 import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import {
+  X,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+  Link2,
+} from 'lucide-react';
 import { Emotion, Reflection, ReflectionSummary } from '../types';
 import { useApp } from '../context/AppContext';
 import { AiService } from '../services/aiService';
@@ -31,7 +38,6 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
   isOpen,
   reflection,
   onClose,
-  onOpenTaskCreate,
 }) => {
   const { addReflection, updateReflection, memories, photos, tasks, summaries } = useApp();
 
@@ -39,6 +45,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
   const [emotion, setEmotion] = useState<Emotion>((reflection?.emotion as Emotion) || '平静');
   const [actionTaken, setActionTaken] = useState(reflection?.actionTaken || '');
   const [result, setResult] = useState(reflection?.result || '');
+  const [lessonsLearned, setLessonsLearned] = useState(reflection?.lessonsLearned || '');
 
   // AI Output
   const [aiSummary, setAiSummary] = useState<ReflectionSummary | null>(reflection?.aiSummary || null);
@@ -86,12 +93,6 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
     }
   };
 
-  const handleConvertTask = () => {
-    if (aiSummary?.suggestedTask && onOpenTaskCreate) {
-      onOpenTaskCreate(aiSummary.suggestedTask);
-    }
-  };
-
   const handleSave = () => {
     if (!eventDescription.trim()) return;
 
@@ -102,6 +103,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
         emotion,
         actionTaken: actionTaken.trim(),
         result: result.trim(),
+        lessonsLearned: lessonsLearned.trim(),
         aiSummary,
         isUserConfirmed: true,
       });
@@ -111,6 +113,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
         emotion,
         actionTaken: actionTaken.trim(),
         result: result.trim(),
+        lessonsLearned: lessonsLearned.trim(),
         aiSummary,
         relatedMemoryIds: aiSummary?.citations.memoryIds || [],
         relatedPhotoIds: aiSummary?.citations.photoIds || [],
@@ -212,8 +215,25 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
             </div>
           </div>
 
+          {/* Section: 总结经验（学到了什么、提醒后续注意） */}
+          <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-amber-900">
+                总结经验（学到了什么、提醒后续注意）
+              </label>
+              <span className="text-[10px] text-amber-700">本次沉淀与未来避坑清单</span>
+            </div>
+            <textarea
+              rows={3}
+              placeholder="总结这次经历学到了什么、踩了什么坑？提醒以后的自己在同类场景中必须注意什么..."
+              value={lessonsLearned}
+              onChange={(e) => setLessonsLearned(e.target.value)}
+              className="w-full text-xs p-2.5 bg-white border border-amber-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
           {/* AI Trigger */}
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="button"
               onClick={handleGenerateAi}
@@ -221,7 +241,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
               className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{generating ? '正在结合历史上下文并执行 V1-V5 校验...' : '生成 AI 深度反思分析'}</span>
+              <span>{generating ? '正在结合历史上下文并执行 V1-V5 校验...' : '生成 AI 关键建议与深度分析'}</span>
             </button>
           </div>
 
@@ -256,7 +276,38 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
                 </div>
               )}
 
-              {/* 6 AI Fields (Editable) */}
+              {/* AI Key Suggestion Card (短而精，提点忽略的细节) */}
+              <div className="p-3 bg-gradient-to-br from-indigo-50/90 to-purple-50/90 rounded-xl border border-indigo-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-indigo-950">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    <span className="text-xs font-bold">
+                      AI 关键建议与盲点提点（短而精）
+                    </span>
+                  </div>
+                  {aiSummary.keySuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const addition = `【AI盲点提点】：${aiSummary.keySuggestion}`;
+                        if (!lessonsLearned.trim()) {
+                          setLessonsLearned(addition);
+                        } else if (!lessonsLearned.includes(aiSummary.keySuggestion!)) {
+                          setLessonsLearned(`${lessonsLearned}\n${addition}`);
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white px-2 py-0.5 rounded-md border border-indigo-200 shadow-2xs transition-colors"
+                    >
+                      + 补充到经验总结
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-indigo-950 leading-relaxed font-medium bg-white/90 p-2.5 rounded-lg border border-indigo-100/90">
+                  {aiSummary.keySuggestion || aiSummary.improvementPoints || '关注引发事件的核心诱因与时间节点，设立前置的防范阻断机制。'}
+                </p>
+              </div>
+
+              {/* 4 AI Core Analysis Fields (Editable) */}
               <div className="space-y-2.5 pt-2 border-t border-slate-200">
                 <div>
                   <span className="text-[11px] font-semibold text-slate-500">1. 事件事实摘要</span>
@@ -299,32 +350,23 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
                   />
                 </div>
 
-                <div>
-                  <span className="text-[11px] font-semibold text-purple-600">5. 下一步建议（动词开头）</span>
-                  <input
-                    type="text"
-                    value={aiSummary.nextSuggestion}
-                    onChange={(e) => setAiSummary({ ...aiSummary, nextSuggestion: e.target.value })}
-                    className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-lg mt-0.5"
-                  />
-                </div>
-
-                {aiSummary.suggestedTask && (
-                  <div className="p-2.5 bg-sky-50/70 border border-sky-100 rounded-lg flex items-center justify-between gap-2">
-                    <div className="flex-1">
-                      <span className="text-[10px] font-semibold text-[#57B8E3] block">
-                        6. 建议创建的闭环待办任务
+                {/* Citations / Context Reference */}
+                {aiSummary.citations && (aiSummary.citations.memoryIds?.length > 0 || aiSummary.citations.photoIds?.length > 0) && (
+                  <div className="pt-1 text-[10px] text-slate-500 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
+                    <span className="flex items-center gap-1 font-medium text-slate-600">
+                      <Link2 className="w-3 h-3" />
+                      分析引用的事实依据:
+                    </span>
+                    {aiSummary.citations.memoryIds?.map((mId) => (
+                      <span key={mId} className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-slate-600">
+                        记忆 #{mId.slice(0, 6)}
                       </span>
-                      <p className="text-xs text-slate-800 font-medium">{aiSummary.suggestedTask}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleConvertTask}
-                      className="px-2.5 py-1 bg-[#57B8E3] hover:bg-[#46a5d0] text-white text-[11px] font-medium rounded-lg flex items-center gap-1 shrink-0"
-                    >
-                      <span>转为待办</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
+                    ))}
+                    {aiSummary.citations.photoIds?.map((pId) => (
+                      <span key={pId} className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-slate-600">
+                        照片 #{pId.slice(0, 6)}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>

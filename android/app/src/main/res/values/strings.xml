@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">AI生活记录系统</string>
-    <string name="title_activity_main">AI生活记录系统</string>
+    <string name="app_name">人生不设限</string>
+    <string name="title_activity_main">人生不设限</string>
     <string name="package_name">com.liferecorder.app</string>
     <string name="custom_url_scheme">com.liferecorder.app</string>
 </resources>

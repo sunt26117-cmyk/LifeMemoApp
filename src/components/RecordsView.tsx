@@ -7,6 +7,8 @@ import { fuzzySearch } from '../utils/fuzzySearch';
 import { MemoryCard } from './records/MemoryCard';
 import { NoteCard } from './records/NoteCard';
 import { PhotoGrid } from './records/PhotoGrid';
+import { DeleteConfirmationModal } from './records/DeleteConfirmationModal';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface RecordsViewProps {
   onOpenMemoryCreate: () => void;
@@ -25,11 +27,31 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   onOpenPhotoCreate,
   onOpenPhotoEdit,
 }) => {
-  const { memories, deleteMemory, notes, deleteNote, photos, deletePhoto } = useApp();
+  const {
+    memories,
+    deleteMemory,
+    notes,
+    deleteNote,
+    photos,
+    deletePhoto,
+    offloadItem,
+    permanentDeleteItem,
+    theme,
+  } = useApp();
+
+  const themeColors = getThemeColors(theme);
 
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'memories' | 'notes' | 'photos'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Dual-track deletion modal state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'photo' | 'memory' | 'note';
+    id: string;
+    title: string;
+    description?: string;
+  } | null>(null);
 
   // All unique tags
   const allTags = useMemo(() => {
@@ -92,7 +114,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     <div className="space-y-4 pb-20">
       {/* Sub Tabs */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl">
+        <div className={`flex gap-1 p-1 ${themeColors.segmentBg} rounded-2xl`}>
           {[
             { id: 'all', label: '全部' },
             { id: 'memories', label: `文字 (${memories.length})` },
@@ -104,8 +126,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-all ${
                 activeSubTab === tab.id
-                  ? 'bg-white text-slate-800 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? `${themeColors.segmentActiveBg} ${themeColors.segmentActiveText} shadow-xs font-semibold`
+                  : `${themeColors.textMuted} hover:${themeColors.textMain}`
               }`}
             >
               {tab.label}
@@ -126,9 +148,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           )}
           {activeSubTab === 'photos' && (
             <button
-              onClick={onOpenPhotoCreate}
-              className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-xs transition-colors"
-              title="添加照片"
+              onClick={onOpenMemoryCreate}
+              className={`p-2 ${themeColors.actionBtn} text-white rounded-xl shadow-xs transition-colors flex items-center gap-1 text-xs font-medium`}
+              title="写记录配图"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -136,7 +158,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           {(activeSubTab === 'all' || activeSubTab === 'memories') && (
             <button
               onClick={onOpenMemoryCreate}
-              className="p-2 bg-[#4A90D9] hover:bg-[#3d7ec1] text-white rounded-xl shadow-xs transition-colors"
+              className={`p-2 ${themeColors.actionBtn} text-white rounded-xl shadow-xs transition-colors`}
               title="写记录"
             >
               <Plus className="w-4 h-4" />
@@ -152,13 +174,13 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           placeholder="模糊搜索记录内容、标题、标签或地点..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full text-xs py-2 px-3 pl-8 bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A90D9] shadow-xs"
+          className={`w-full text-xs py-2 px-3 pl-8 ${themeColors.cardBg} border ${themeColors.cardBorder} rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-400 shadow-xs ${themeColors.textMain}`}
         />
-        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
+        <Search className={`w-3.5 h-3.5 ${themeColors.textSub} absolute left-2.5 top-3`} />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="text-xs text-slate-400 hover:text-slate-600 absolute right-3 top-2"
+            className={`text-xs ${themeColors.textSub} hover:${themeColors.textMain} absolute right-3 top-2`}
           >
             ×
           </button>
@@ -172,8 +194,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             onClick={() => setSelectedTag(null)}
             className={`px-2.5 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
               selectedTag === null
-                ? 'bg-slate-800 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? `${themeColors.primaryBg} text-white shadow-xs`
+                : `${themeColors.subtleBg} ${themeColors.textMuted} hover:${themeColors.textMain} border ${themeColors.subtleBorder}`
             }`}
           >
             全部标签
@@ -184,8 +206,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
               className={`px-2.5 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
                 selectedTag === tag
-                  ? 'bg-[#4A90D9] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? `${themeColors.primaryBg} text-white shadow-xs`
+                  : `${themeColors.subtleBg} ${themeColors.textMuted} hover:${themeColors.textMain} border ${themeColors.subtleBorder}`
               }`}
             >
               #{tag}
@@ -202,14 +224,22 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             activeSubTab={activeSubTab}
             onViewAll={() => setActiveSubTab('photos')}
             onEdit={onOpenPhotoEdit}
-            onDelete={deletePhoto}
+            onDelete={(id) => {
+              const p = photos.find((x) => x.id === id);
+              setDeleteTarget({
+                type: 'photo',
+                id,
+                title: '删除照片记录',
+                description: p?.aiSummary || '包含照片文件与AI解析摘要',
+              });
+            }}
           />
         )}
 
         {(activeSubTab === 'all' || activeSubTab === 'notes') && filteredNotes.length > 0 && (
           <div className="space-y-2">
             {activeSubTab === 'all' && (
-              <span className="text-xs font-semibold text-slate-700 block px-1">
+              <span className={`text-xs font-semibold ${themeColors.textMain} block px-1`}>
                 便签备忘 ({filteredNotes.length})
               </span>
             )}
@@ -219,7 +249,14 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                   key={note.id}
                   note={note}
                   onEdit={onOpenNoteEdit}
-                  onDelete={deleteNote}
+                  onDelete={(id) => {
+                    setDeleteTarget({
+                      type: 'note',
+                      id,
+                      title: '删除便签备忘',
+                      description: note.title || note.content,
+                    });
+                  }}
                 />
               ))}
             </div>
@@ -229,13 +266,13 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         {(activeSubTab === 'all' || activeSubTab === 'memories') && (
           <div className="space-y-2.5">
             {activeSubTab === 'all' && (
-              <span className="text-xs font-semibold text-slate-700 block px-1">
+              <span className={`text-xs font-semibold ${themeColors.textMain} block px-1`}>
                 日记与事实记录 ({filteredMemories.length})
               </span>
             )}
 
             {filteredMemories.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center text-xs text-slate-400">
+              <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center text-xs ${themeColors.textSub}`}>
                 暂无匹配的记录内容
               </div>
             ) : (
@@ -244,13 +281,48 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                   key={mem.id}
                   memory={mem}
                   onEdit={onOpenMemoryEdit}
-                  onDelete={deleteMemory}
+                  onDelete={(id) => {
+                    setDeleteTarget({
+                      type: 'memory',
+                      id,
+                      title: '删除日记/事实记录',
+                      description: mem.title ? `${mem.title} - ${mem.content}` : mem.content,
+                    });
+                  }}
                 />
               ))
             )}
           </div>
         )}
       </div>
+
+      {/* Dual-Track Delete / Offload Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title={deleteTarget?.title || '删除记录'}
+        itemDescription={deleteTarget?.description}
+        onOffload={() => {
+          if (deleteTarget) {
+            const collectionMap = {
+              memory: 'memories',
+              photo: 'photos',
+              note: 'notes',
+            } as const;
+            offloadItem(collectionMap[deleteTarget.type], deleteTarget.id);
+          }
+        }}
+        onPermanentDelete={() => {
+          if (deleteTarget) {
+            const collectionMap = {
+              memory: 'memories',
+              photo: 'photos',
+              note: 'notes',
+            } as const;
+            permanentDeleteItem(collectionMap[deleteTarget.type], deleteTarget.id);
+          }
+        }}
+      />
     </div>
   );
 };

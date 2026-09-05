@@ -24,11 +24,11 @@ export const PhotoEditModal: React.FC<PhotoEditModalProps> = ({
 }) => {
   const { addPhoto, updatePhoto } = useApp();
 
-  const [localPath, setLocalPath] = useState(photo?.localPath || SAMPLE_PHOTO_PRESETS[0]);
-  const [aiSummary, setAiSummary] = useState(photo?.aiSummary || '拍摄了会议记录与工作要点草稿');
-  const [summaryConfirmed, setSummaryConfirmed] = useState(photo?.summaryConfirmed ?? true);
-  const [locationName, setLocationName] = useState(photo?.locationName || '会议室 / 工位');
-  const [tags, setTags] = useState<string[]>(photo?.tags || ['照片', '工作']);
+  const [localPath, setLocalPath] = useState(photo?.localPath || '');
+  const [aiSummary, setAiSummary] = useState(photo?.aiSummary || '');
+  const [summaryConfirmed, setSummaryConfirmed] = useState(photo?.summaryConfirmed ?? false);
+  const [locationName, setLocationName] = useState(photo?.locationName || '');
+  const [tags, setTags] = useState<string[]>(photo?.tags || []);
 
   if (!isOpen) return null;
 

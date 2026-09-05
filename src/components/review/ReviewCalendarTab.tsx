@@ -4,13 +4,45 @@ import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getLunarDisplay } from '../../utils/lunarUtil';
 import { ManageHabitsModal } from './ManageHabitsModal';
+import { getThemeColors } from '../../utils/themeStyles';
 
 export const ReviewCalendarTab: React.FC = () => {
-  const { checkInRecords, checkInTypes, toggleCheckIn } = useApp();
+  const { checkInRecords, checkInTypes, toggleCheckIn, statAnchorDate, theme } = useApp();
+  const themeColors = getThemeColors(theme);
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [showManageTypesModal, setShowManageTypesModal] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const anchorDateStr = statAnchorDate ? statAnchorDate.split('T')[0] : null;
+
+  // Filter checkInRecords by statAnchorDate
+  const validCheckInRecords = useMemo(() => {
+    if (!anchorDateStr) return checkInRecords;
+    return checkInRecords.filter((r) => r.date >= anchorDateStr);
+  }, [checkInRecords, anchorDateStr]);
+
+  // Calculate Streak (连续打卡天数，受锚点过滤约束)
+  const streak = useMemo(() => {
+    const datesSet = new Set(validCheckInRecords.map((r) => r.date));
+    let count = 0;
+    const checkDate = new Date();
+    // Check today first, if not checked yet check yesterday
+    const todayFormatted = checkDate.toISOString().split('T')[0];
+    if (!datesSet.has(todayFormatted)) {
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    while (true) {
+      const dStr = checkDate.toISOString().split('T')[0];
+      if (anchorDateStr && dStr < anchorDateStr) break;
+      if (datesSet.has(dStr)) {
+        count++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [validCheckInRecords, anchorDateStr]);
 
   // Calendar Month Days
   const calendarDays = useMemo(() => {
@@ -45,7 +77,7 @@ export const ReviewCalendarTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
+      <div className={`${themeColors.cardBg} p-4 rounded-2xl border ${themeColors.cardBorder} shadow-xs`}>
         {/* Calendar Month Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
@@ -55,11 +87,11 @@ export const ReviewCalendarTab: React.FC = () => {
                   new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1)
                 )
               }
-              className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+              className={`p-1 ${themeColors.subtleBg} hover:opacity-80 rounded-lg ${themeColors.textMain} transition-colors border ${themeColors.subtleBorder}`}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <h3 className="text-xs font-semibold text-slate-800">
+            <h3 className={`text-xs font-semibold ${themeColors.textMain}`}>
               {currentMonthDate.getFullYear()}年 {currentMonthDate.getMonth() + 1}月
             </h3>
             <button
@@ -68,24 +100,29 @@ export const ReviewCalendarTab: React.FC = () => {
                   new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1)
                 )
               }
-              className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+              className={`p-1 ${themeColors.subtleBg} hover:opacity-80 rounded-lg ${themeColors.textMain} transition-colors border ${themeColors.subtleBorder}`}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
-          <button
-            onClick={() => setShowManageTypesModal(true)}
-            className="text-[11px] text-[#4A90D9] hover:underline font-medium"
-          >
-            管理习惯分类
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100/70 text-amber-800 font-semibold border border-amber-300">
+              🔥 连续打卡 {streak} 天
+            </span>
+            <button
+              onClick={() => setShowManageTypesModal(true)}
+              className={`text-[11px] ${themeColors.primaryText} hover:underline font-medium`}
+            >
+              管理习惯
+            </button>
+          </div>
         </div>
 
         {/* Weekdays */}
-        <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-400 mb-1">
+        <div className={`grid grid-cols-7 gap-1 text-center text-[11px] font-semibold ${themeColors.textSub} mb-1`}>
           {['日', '一', '二', '三', '四', '五', '六'].map((w, idx) => (
-            <div key={idx} className={idx === 0 || idx === 6 ? 'text-rose-400' : ''}>
+            <div key={idx} className={idx === 0 || idx === 6 ? 'text-rose-500 font-semibold' : ''}>
               {w}
             </div>
           ))}
@@ -96,7 +133,7 @@ export const ReviewCalendarTab: React.FC = () => {
           {calendarDays.map((item, idx) => {
             const isToday = item.dateStr === todayStr;
             const lunar = getLunarDisplay(item.dateObj);
-            const dayRecords = checkInRecords.filter((r) => r.date === item.dateStr);
+            const dayRecords = validCheckInRecords.filter((r) => r.date === item.dateStr);
 
             return (
               <div
@@ -105,13 +142,13 @@ export const ReviewCalendarTab: React.FC = () => {
                   !item.isCurrentMonth
                     ? 'opacity-30 border-transparent'
                     : isToday
-                    ? 'bg-sky-50 border-[#4A90D9]/60'
-                    : 'border-slate-100 hover:bg-slate-50'
+                    ? `${themeColors.badgeBg} border-2 ${themeColors.primaryBorder}`
+                    : `${themeColors.cardBorder} hover:${themeColors.subtleBg}`
                 }`}
               >
                 <span
                   className={`text-[11px] font-semibold ${
-                    isToday ? 'text-[#4A90D9]' : item.isCurrentMonth ? 'text-slate-700' : 'text-slate-400'
+                    isToday ? themeColors.primaryText : item.isCurrentMonth ? themeColors.textMain : themeColors.textSub
                   }`}
                 >
                   {item.dateObj.getDate()}
@@ -120,7 +157,7 @@ export const ReviewCalendarTab: React.FC = () => {
                 {/* Lunar or Festival */}
                 <span
                   className={`text-[9px] truncate max-w-full ${
-                    lunar.isFestival ? 'text-rose-500 font-medium' : 'text-slate-400'
+                    lunar.isFestival ? 'text-rose-500 font-medium' : themeColors.textSub
                   }`}
                 >
                   {lunar.text}
@@ -132,7 +169,7 @@ export const ReviewCalendarTab: React.FC = () => {
                     <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#4CAF50]" />
                   ))}
                   {dayRecords.length > 3 && (
-                    <span className="w-1 h-1 rounded-full bg-slate-400" />
+                    <span className={`w-1 h-1 rounded-full ${themeColors.textSub}`} />
                   )}
                 </div>
               </div>
@@ -142,8 +179,8 @@ export const ReviewCalendarTab: React.FC = () => {
       </div>
 
       {/* Today Habits Toggle Panel */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
-        <h4 className="text-xs font-semibold text-slate-800 mb-2">
+      <div className={`${themeColors.cardBg} p-4 rounded-2xl border ${themeColors.cardBorder} shadow-xs`}>
+        <h4 className={`text-xs font-semibold ${themeColors.textMain} mb-2`}>
           今日习惯打卡清单 ({todayStr})
         </h4>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -157,8 +194,8 @@ export const ReviewCalendarTab: React.FC = () => {
                 onClick={() => toggleCheckIn(todayStr, type)}
                 className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-medium transition-all ${
                   isChecked
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    ? 'bg-emerald-100/70 border-emerald-300 text-emerald-900 shadow-xs'
+                    : `${themeColors.subtleBg} ${themeColors.subtleBorder} ${themeColors.textMain} hover:border-slate-300`
                 }`}
               >
                 <span className="flex items-center gap-1.5">
@@ -168,7 +205,7 @@ export const ReviewCalendarTab: React.FC = () => {
                 {isChecked ? (
                   <CheckCircle2 className="w-4 h-4 text-[#4CAF50]" />
                 ) : (
-                  <span className="w-4 h-4 rounded-full border border-slate-300" />
+                  <span className={`w-4 h-4 rounded-full border ${themeColors.cardBorder} ${themeColors.cardBg}`} />
                 )}
               </button>
             );

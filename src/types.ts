@@ -1,6 +1,24 @@
 // src/types.ts
 
-export type TaskCategory = '沟通' | '学习' | '健康' | '项目' | '情绪' | '习惯' | '规划';
+export type TaskCategory =
+  | '生活日常'
+  | '健康作息'
+  | '个人学习'
+  | '情绪觉察'
+  | '休闲放松'
+  | '人际沟通'
+  | '习惯打卡'
+  | '个人财务'
+  | '沟通'
+  | '学习'
+  | '健康'
+  | '项目'
+  | '情绪'
+  | '习惯'
+  | '规划'
+  | string;
+
+export type AppTheme = 'sky' | 'warm' | 'forest';
 
 export type TaskStatus = '未开始' | '进行中' | '已完成' | '延期' | '取消';
 
@@ -19,6 +37,8 @@ export type DelayType = '外部' | '内部' | '逃避';
 
 export type CancelType = '主动' | '被动' | '逃避';
 
+export type LocalStorageStatus = 'downloaded' | 'offloaded';
+
 export interface Memory {
   id: string;
   title: string | null;
@@ -26,6 +46,13 @@ export interface Memory {
   tags: string[];
   aiSummary: string | null;
   relatedMediaIds: string[];
+  photos?: string[]; // 支持朋友圈式多图
+  locationName?: string | null; // 所在城市/地点
+  latitude?: number | null;
+  longitude?: number | null;
+  localStorageStatus?: LocalStorageStatus;
+  isDeleted?: boolean;
+  localUpdatedAt?: string;
   createdAt: string;
 }
 
@@ -41,6 +68,9 @@ export interface Photo {
   latitude?: number | null;
   longitude?: number | null;
   metadata?: Record<string, any>;
+  localStorageStatus?: LocalStorageStatus;
+  isDeleted?: boolean;
+  localUpdatedAt?: string;
   createdAt: string;
 }
 
@@ -50,6 +80,9 @@ export interface Note {
   content: string;
   tags: string[];
   isPinned: boolean;
+  localStorageStatus?: LocalStorageStatus;
+  isDeleted?: boolean;
+  localUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,6 +136,9 @@ export interface Task {
   sourceReflectionId?: string | null;
   checkInTypeId?: string | null;
   feedback?: TaskFeedback;
+  localStorageStatus?: LocalStorageStatus;
+  isDeleted?: boolean;
+  localUpdatedAt?: string;
   createdAt: string;
 }
 
@@ -118,6 +154,7 @@ export interface ReflectionSummary {
   improvementPoints: string;
   nextSuggestion: string;
   suggestedTask: string | null;
+  keySuggestion?: string | null; // AI 关键建议（短而精，提点忽略细节）
   citations: Citations;
 }
 
@@ -127,6 +164,7 @@ export interface Reflection {
   emotion: Emotion | string;
   actionTaken?: string | null;
   result?: string | null;
+  lessonsLearned?: string | null; // 总结经验（学到了什么、提醒后续注意）
   aiSummary?: ReflectionSummary | null;
   relatedMemoryIds: string[];
   relatedPhotoIds: string[];
@@ -134,6 +172,9 @@ export interface Reflection {
   relatedSummaryIds: string[];
   isUserConfirmed: boolean;
   pendingAI?: boolean;
+  localStorageStatus?: LocalStorageStatus;
+  isDeleted?: boolean;
+  localUpdatedAt?: string;
   createdAt: string;
 }
 
@@ -188,9 +229,17 @@ export interface ThemeItem {
 export interface Summary {
   id: string;
   type: SummaryType;
+  cycleType?: 'week' | 'month' | 'year';
+  periodKey?: string; // 周期唯一标识（周：2026-W36，月：2026-09，年：2026）
   periodStart: string;
   periodEnd: string;
   content: string;
+  isFrozen?: boolean; // 是否已跨期封印锁定
+  version?: number; // 更新版本号，默认 1
+  updatedAt?: string;
+  localStorageStatus?: LocalStorageStatus;
+  isDeleted?: boolean;
+  localUpdatedAt?: string;
   themes: { name: string; direction: ThemeDirection; weight: number }[];
   highlights: string[];
   taskSuggestions: string[];
@@ -204,6 +253,18 @@ export interface Summary {
     nextYearSuggestions: string[];
   };
   createdAt: string;
+}
+
+export interface AssistSuggestionItem {
+  id: string;
+  relatedField: 'eventDescription' | 'emotion' | 'actionTaken' | 'result';
+  text: string;
+  state: 'pending' | 'accepted';
+}
+
+export interface AssistSuggestionsState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  items: AssistSuggestionItem[];
 }
 
 export type TaskDifficulty = 'easy' | 'normal' | 'hard';

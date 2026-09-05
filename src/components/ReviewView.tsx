@@ -6,6 +6,8 @@ import { ReviewReflectionsTab } from './review/ReviewReflectionsTab';
 import { ReviewCalendarTab } from './review/ReviewCalendarTab';
 import { ReviewTrendsTab } from './review/ReviewTrendsTab';
 import { ReviewSummaryTab } from './review/ReviewSummaryTab';
+import { useApp } from '../context/AppContext';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface ReviewViewProps {
   onOpenReflectionCreate: () => void;
@@ -20,6 +22,9 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   onUnlockBiometric,
   onOpenTaskCreate,
 }) => {
+  const { theme } = useApp();
+  const themeColors = getThemeColors(theme);
+
   const [reviewSubTab, setReviewSubTab] = useState<'reflections' | 'calendar' | 'trends' | 'summary'>(
     'reflections'
   );
@@ -27,7 +32,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   return (
     <div className="space-y-4 pb-20">
       {/* 4 Sub-Tabs */}
-      <div className="flex p-1 bg-slate-100 rounded-2xl gap-1">
+      <div className={`flex p-1 ${themeColors.segmentBg} rounded-2xl gap-1`}>
         {[
           { id: 'reflections', label: '反思记录', icon: Sparkles },
           { id: 'calendar', label: '打卡日历', icon: Calendar },
@@ -42,8 +47,8 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
               onClick={() => setReviewSubTab(tab.id as any)}
               className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 text-xs font-medium rounded-xl transition-all ${
                 isActive
-                  ? 'bg-white text-slate-800 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? `${themeColors.segmentActiveBg} ${themeColors.segmentActiveText} shadow-xs font-semibold`
+                  : `${themeColors.textMuted} hover:${themeColors.textMain}`
               }`}
             >
               <Icon className="w-3.5 h-3.5" />

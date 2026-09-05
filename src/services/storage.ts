@@ -1,5 +1,6 @@
 // src/services/storage.ts
 import {
+  AppTheme,
   CheckInRecord,
   CheckInType,
   Memory,
@@ -7,6 +8,7 @@ import {
   Photo,
   Reflection,
   Summary,
+  SummaryType,
   Task,
   ThemeItem,
   Trend,
@@ -26,6 +28,29 @@ import {
 import { supabaseService } from './supabaseService';
 import { ensureUuid } from '../utils/uuidUtil';
 
+export function getPeriodKey(
+  type: SummaryType | 'week' | 'month' | 'year',
+  date: Date = new Date()
+): string {
+  const y = date.getFullYear();
+  if (type === '年' || type === 'year') return `${y}`;
+  if (type === '月' || type === 'month') {
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+  // 周 (ISO Week)
+  const target = new Date(date.valueOf());
+  const dayNr = (date.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+  }
+  const weekNr = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  return `${y}-W${String(weekNr).padStart(2, '0')}`;
+}
+
 const STORAGE_KEYS = {
   MEMORIES: 'ai_recorder_memories',
   PHOTOS: 'ai_recorder_photos',
@@ -39,7 +64,68 @@ const STORAGE_KEYS = {
   SUMMARIES: 'ai_recorder_summaries',
   API_KEY: 'ai_recorder_api_key',
   BIOMETRIC_PIN: 'ai_recorder_pin',
+  STAT_ANCHOR_DATE: 'stat_anchor_date',
+  OFFLOADED_IDS: 'ai_recorder_offloaded_ids',
+  LAST_RECONCILE_TIME: 'last_reconcile_time',
+  TASK_CATEGORIES: 'ai_recorder_task_categories',
+  APP_THEME: 'ai_recorder_app_theme',
+  CLEANUP_V2: 'ai_recorder_cleaned_v2',
+  CLEANUP_TEMPLATE_PURGE: 'ai_recorder_cleaned_template_purge_v3',
 };
+
+export const isTemplateId = (id?: string | null): boolean => {
+  if (!id) return false;
+  return /^(mem|photo|note|task|ref)-\d+$/.test(id);
+};
+
+export const DEFAULT_TASK_CATEGORIES: string[] = [
+  '生活日常',
+  '健康作息',
+  '个人学习',
+  '情绪觉察',
+  '休闲放松',
+  '人际沟通',
+  '习惯打卡',
+  '个人财务',
+];
+
+// 启动时自动彻底清空所有模板内容、打卡、趋势与周期总结，并将今日设为第一天起始锚点
+try {
+  if (typeof window !== 'undefined') {
+    const isPurged = localStorage.getItem(STORAGE_KEYS.CLEANUP_TEMPLATE_PURGE) === 'true';
+    if (!isPurged) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      localStorage.setItem(STORAGE_KEYS.STAT_ANCHOR_DATE, today.toISOString());
+
+      const purgeArray = (key: string) => {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) return;
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const filtered = list.filter((item: any) => item?.id && !isTemplateId(item.id));
+            localStorage.setItem(key, JSON.stringify(filtered));
+          }
+        } catch (_) {}
+      };
+
+      purgeArray(STORAGE_KEYS.MEMORIES);
+      purgeArray(STORAGE_KEYS.PHOTOS);
+      purgeArray(STORAGE_KEYS.NOTES);
+      purgeArray(STORAGE_KEYS.TASKS);
+      purgeArray(STORAGE_KEYS.REFLECTIONS);
+
+      // 清空之前由模板内容计入的打卡记录、趋势、主题和周期总结
+      localStorage.setItem(STORAGE_KEYS.CHECKIN_RECORDS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.TRENDS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.THEMES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.SUMMARIES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.CLEANUP_TEMPLATE_PURGE, 'true');
+    }
+  }
+} catch (_) {}
+
 
 function getLocal<T>(key: string, defaultValue: T): T {
   try {
@@ -63,7 +149,8 @@ function setLocal<T>(key: string, value: T): void {
 export class AppStorage {
   // Memories
   static getMemories(): Memory[] {
-    return getLocal<Memory[]>(STORAGE_KEYS.MEMORIES, initialMemories);
+    const list = getLocal<Memory[]>(STORAGE_KEYS.MEMORIES, initialMemories);
+    return list.filter((m) => !isTemplateId(m.id));
   }
   static saveMemories(items: Memory[]): void {
     setLocal(STORAGE_KEYS.MEMORIES, items);
@@ -97,7 +184,8 @@ export class AppStorage {
 
   // Photos
   static getPhotos(): Photo[] {
-    return getLocal<Photo[]>(STORAGE_KEYS.PHOTOS, initialPhotos);
+    const list = getLocal<Photo[]>(STORAGE_KEYS.PHOTOS, initialPhotos);
+    return list.filter((p) => !isTemplateId(p.id));
   }
   static savePhotos(items: Photo[]): void {
     setLocal(STORAGE_KEYS.PHOTOS, items);
@@ -138,7 +226,8 @@ export class AppStorage {
 
   // Notes
   static getNotes(): Note[] {
-    return getLocal<Note[]>(STORAGE_KEYS.NOTES, initialNotes);
+    const list = getLocal<Note[]>(STORAGE_KEYS.NOTES, initialNotes);
+    return list.filter((n) => !isTemplateId(n.id));
   }
   static saveNotes(items: Note[]): void {
     setLocal(STORAGE_KEYS.NOTES, items);
@@ -171,7 +260,8 @@ export class AppStorage {
 
   // Tasks
   static getTasks(): Task[] {
-    return getLocal<Task[]>(STORAGE_KEYS.TASKS, initialTasks);
+    const list = getLocal<Task[]>(STORAGE_KEYS.TASKS, initialTasks);
+    return list.filter((t) => !isTemplateId(t.id));
   }
   static saveTasks(items: Task[]): void {
     setLocal(STORAGE_KEYS.TASKS, items);
@@ -213,7 +303,8 @@ export class AppStorage {
 
   // Reflections
   static getReflections(): Reflection[] {
-    return getLocal<Reflection[]>(STORAGE_KEYS.REFLECTIONS, initialReflections);
+    const list = getLocal<Reflection[]>(STORAGE_KEYS.REFLECTIONS, initialReflections);
+    return list.filter((r) => !isTemplateId(r.id));
   }
   static saveReflections(items: Reflection[]): void {
     setLocal(STORAGE_KEYS.REFLECTIONS, items);
@@ -311,35 +402,363 @@ export class AppStorage {
 
   // Trends & Themes
   static getTrends(): Trend[] {
-    return getLocal<Trend[]>(STORAGE_KEYS.TRENDS, initialTrends);
+    const list = getLocal<Trend[]>(STORAGE_KEYS.TRENDS, initialTrends);
+    return list
+      .map((tr) => ({
+        ...tr,
+        evidence: (tr.evidence || []).filter((ev) => !isTemplateId(ev.taskId)),
+      }))
+      .filter((tr) => tr.evidence.length > 0);
   }
   static saveTrends(items: Trend[]): void {
     setLocal(STORAGE_KEYS.TRENDS, items);
   }
 
   static getThemes(): ThemeItem[] {
-    return getLocal<ThemeItem[]>(STORAGE_KEYS.THEMES, initialThemes);
+    const list = getLocal<ThemeItem[]>(STORAGE_KEYS.THEMES, initialThemes);
+    return list.filter((th) => th.weight > 0 && th.trendNames && th.trendNames.length > 0);
   }
   static saveThemes(items: ThemeItem[]): void {
     setLocal(STORAGE_KEYS.THEMES, items);
   }
 
-  // Summaries
+// Summaries
   static getSummaries(): Summary[] {
-    return getLocal<Summary[]>(STORAGE_KEYS.SUMMARIES, initialSummaries);
+    const items = getLocal<Summary[]>(STORAGE_KEYS.SUMMARIES, initialSummaries);
+    let changed = false;
+    const now = new Date();
+    const updated = items.map((item) => {
+      if (!item.periodKey) {
+        item.periodKey = getPeriodKey(item.type, new Date(item.periodStart || item.createdAt));
+        changed = true;
+      }
+      const currentPeriod = getPeriodKey(item.type, now);
+      if (item.periodKey !== currentPeriod && !item.isFrozen) {
+        item.isFrozen = true;
+        changed = true;
+      }
+      return item;
+    });
+    if (changed) {
+      setLocal(STORAGE_KEYS.SUMMARIES, updated);
+    }
+    return updated;
   }
+
   static saveSummaries(items: Summary[]): void {
     setLocal(STORAGE_KEYS.SUMMARIES, items);
   }
-  static upsertSummary(item: Summary): void {
+
+  static upsertSummary(item: Summary): { success: boolean; summary: Summary; message?: string } {
     const items = this.getSummaries();
-    const idx = items.findIndex((s) => s.id === item.id);
-    if (idx >= 0) {
-      items[idx] = item;
-    } else {
-      items.unshift(item);
+    const currentPeriod = getPeriodKey(item.type, new Date());
+    if (!item.periodKey) {
+      item.periodKey = currentPeriod;
     }
-    this.saveSummaries(items);
+
+    const existingIdx = items.findIndex(
+      (s) => (s.id === item.id) || (s.periodKey === item.periodKey && s.type === item.type)
+    );
+
+    if (existingIdx >= 0) {
+      const existing = items[existingIdx];
+      if (existing.isFrozen) {
+        return { success: false, summary: existing, message: '历史总结已封印归档，禁止被新周期覆盖或重新刷新' };
+      }
+      const updated: Summary = {
+        ...existing,
+        content: item.content,
+        themes: item.themes || existing.themes,
+        highlights: item.highlights || existing.highlights,
+        taskSuggestions: item.taskSuggestions || existing.taskSuggestions,
+        annualData: item.annualData || existing.annualData,
+        version: (existing.version || 1) + 1,
+        updatedAt: new Date().toISOString(),
+        isFrozen: false,
+      };
+      items[existingIdx] = updated;
+      this.saveSummaries(items);
+      supabaseService.syncRecord('summaries', 'upsert', updated.id, {
+        id: updated.id,
+        type: updated.type,
+        period_start: updated.periodStart,
+        period_end: updated.periodEnd,
+        period_key: updated.periodKey,
+        is_frozen: false,
+        version: updated.version,
+        content: updated.content,
+        themes: updated.themes,
+        highlights: updated.highlights,
+        task_suggestions: updated.taskSuggestions,
+        annual_data: updated.annualData,
+        created_at: updated.createdAt,
+      });
+      return { success: true, summary: updated };
+    } else {
+      const newSummary: Summary = {
+        ...item,
+        version: 1,
+        isFrozen: false,
+        updatedAt: new Date().toISOString(),
+      };
+      items.unshift(newSummary);
+      this.saveSummaries(items);
+      supabaseService.syncRecord('summaries', 'upsert', newSummary.id, {
+        id: newSummary.id,
+        type: newSummary.type,
+        period_start: newSummary.periodStart,
+        period_end: newSummary.periodEnd,
+        period_key: newSummary.periodKey,
+        is_frozen: false,
+        version: 1,
+        content: newSummary.content,
+        themes: newSummary.themes,
+        highlights: newSummary.highlights,
+        task_suggestions: newSummary.taskSuggestions,
+        annual_data: newSummary.annualData,
+        created_at: newSummary.createdAt,
+      });
+      return { success: true, summary: newSummary };
+    }
+  }
+
+  // Statistics Anchor Date (模块 1)
+  static getStatAnchorDate(): string | null {
+    return localStorage.getItem(STORAGE_KEYS.STAT_ANCHOR_DATE);
+  }
+
+  static setStatAnchorDate(date: string | null): void {
+    if (date) {
+      localStorage.setItem(STORAGE_KEYS.STAT_ANCHOR_DATE, date);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.STAT_ANCHOR_DATE);
+    }
+    window.dispatchEvent(new CustomEvent('app_storage_updated', { detail: { key: 'STAT_ANCHOR_DATE' } }));
+  }
+
+  static resetCheckInsAndTrends(): void {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const anchorIso = today.toISOString();
+    this.setStatAnchorDate(anchorIso);
+    this.saveCheckInRecords([]);
+    this.saveTrends([]);
+    this.saveThemes([]);
+    this.saveSummaries([]);
+    window.dispatchEvent(
+      new CustomEvent('app_storage_updated', { detail: { key: 'RESET_CHECKIN_TRENDS' } })
+    );
+  }
+
+  // Dynamic Task Categories
+  static getTaskCategories(): string[] {
+    return getLocal<string[]>(STORAGE_KEYS.TASK_CATEGORIES, DEFAULT_TASK_CATEGORIES);
+  }
+
+  static saveTaskCategories(categories: string[]): void {
+    setLocal(STORAGE_KEYS.TASK_CATEGORIES, categories);
+  }
+
+  static addTaskCategory(name: string): boolean {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const current = this.getTaskCategories();
+    if (current.includes(trimmed)) return false;
+    this.saveTaskCategories([...current, trimmed]);
+    return true;
+  }
+
+  static deleteTaskCategory(name: string): void {
+    const current = this.getTaskCategories();
+    const updated = current.filter((c) => c !== name);
+    this.saveTaskCategories(updated.length > 0 ? updated : ['日常']);
+  }
+
+  static resetTaskCategories(): void {
+    this.saveTaskCategories(DEFAULT_TASK_CATEGORIES);
+  }
+
+  // App Theme ('sky' | 'warm' | 'forest')
+  static getAppTheme(): AppTheme {
+    const stored = localStorage.getItem(STORAGE_KEYS.APP_THEME);
+    if (stored === 'sky' || stored === 'warm' || stored === 'forest') {
+      return stored as AppTheme;
+    }
+    if (stored === 'night') {
+      return 'forest';
+    }
+    return 'sky';
+  }
+
+  static setAppTheme(theme: AppTheme): void {
+    localStorage.setItem(STORAGE_KEYS.APP_THEME, theme);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    window.dispatchEvent(new CustomEvent('app_storage_updated', { detail: { key: 'APP_THEME' } }));
+  }
+
+
+  // Offloaded IDs & Dual-track Deletion (模块 3)
+  static getOffloadedIds(): string[] {
+    return getLocal<string[]>(STORAGE_KEYS.OFFLOADED_IDS, []);
+  }
+
+  static addOffloadedId(id: string): void {
+    const ids = this.getOffloadedIds();
+    if (!ids.includes(id)) {
+      ids.push(id);
+      setLocal(STORAGE_KEYS.OFFLOADED_IDS, ids);
+    }
+  }
+
+  static removeOffloadedId(id: string): void {
+    const ids = this.getOffloadedIds().filter((i) => i !== id);
+    setLocal(STORAGE_KEYS.OFFLOADED_IDS, ids);
+  }
+
+  static isOffloaded(id: string): boolean {
+    return this.getOffloadedIds().includes(id);
+  }
+
+  // 48-Hour Reconcile (模块 4)
+  static getLastReconcileTime(): number {
+    const val = localStorage.getItem(STORAGE_KEYS.LAST_RECONCILE_TIME);
+    return val ? parseInt(val, 10) : 0;
+  }
+
+  static setLastReconcileTime(time: number): void {
+    localStorage.setItem(STORAGE_KEYS.LAST_RECONCILE_TIME, String(time));
+  }
+
+  // Dual-Track Operations: Offload vs Permanent Delete
+  static offloadItem(collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries', id: string): void {
+    this.addOffloadedId(id);
+    switch (collection) {
+      case 'memories': {
+        const list = this.getMemories().filter((m) => m.id !== id);
+        this.saveMemories(list);
+        break;
+      }
+      case 'photos': {
+        const list = this.getPhotos().filter((p) => p.id !== id);
+        this.savePhotos(list);
+        break;
+      }
+      case 'notes': {
+        const list = this.getNotes().filter((n) => n.id !== id);
+        this.saveNotes(list);
+        break;
+      }
+      case 'tasks': {
+        const list = this.getTasks().filter((t) => t.id !== id);
+        this.saveTasks(list);
+        break;
+      }
+      case 'reflections': {
+        const list = this.getReflections().filter((r) => r.id !== id);
+        this.saveReflections(list);
+        break;
+      }
+      case 'summaries': {
+        const list = this.getSummaries().filter((s) => s.id !== id);
+        this.saveSummaries(list);
+        break;
+      }
+    }
+    // 严禁向云端发送 DELETE 请求；仅标记云端 local_storage_status 为 offloaded
+    supabaseService.syncRecord(collection, 'upsert', id, {
+      local_storage_status: 'offloaded',
+      is_deleted: false,
+    });
+  }
+
+  static permanentDeleteItem(collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries', id: string): void {
+    this.removeOffloadedId(id);
+    switch (collection) {
+      case 'memories': {
+        const list = this.getMemories().filter((m) => m.id !== id);
+        this.saveMemories(list);
+        break;
+      }
+      case 'photos': {
+        const list = this.getPhotos().filter((p) => p.id !== id);
+        this.savePhotos(list);
+        break;
+      }
+      case 'notes': {
+        const list = this.getNotes().filter((n) => n.id !== id);
+        this.saveNotes(list);
+        break;
+      }
+      case 'tasks': {
+        const list = this.getTasks().filter((t) => t.id !== id);
+        this.saveTasks(list);
+        break;
+      }
+      case 'reflections': {
+        const list = this.getReflections().filter((r) => r.id !== id);
+        this.saveReflections(list);
+        break;
+      }
+      case 'summaries': {
+        const list = this.getSummaries().filter((s) => s.id !== id);
+        this.saveSummaries(list);
+        break;
+      }
+    }
+    // 向云端同步软删除标记
+    supabaseService.syncRecord(collection, 'upsert', id, {
+      is_deleted: true,
+    });
+  }
+
+  static restoreItem(collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries', item: any): void {
+    this.removeOffloadedId(item.id);
+    item.localStorageStatus = 'downloaded';
+    item.isDeleted = false;
+    switch (collection) {
+      case 'memories': {
+        const list = this.getMemories().filter((m) => m.id !== item.id);
+        list.unshift(item);
+        this.saveMemories(list);
+        break;
+      }
+      case 'photos': {
+        const list = this.getPhotos().filter((p) => p.id !== item.id);
+        list.unshift(item);
+        this.savePhotos(list);
+        break;
+      }
+      case 'notes': {
+        const list = this.getNotes().filter((n) => n.id !== item.id);
+        list.unshift(item);
+        this.saveNotes(list);
+        break;
+      }
+      case 'tasks': {
+        const list = this.getTasks().filter((t) => t.id !== item.id);
+        list.unshift(item);
+        this.saveTasks(list);
+        break;
+      }
+      case 'reflections': {
+        const list = this.getReflections().filter((r) => r.id !== item.id);
+        list.unshift(item);
+        this.saveReflections(list);
+        break;
+      }
+      case 'summaries': {
+        const list = this.getSummaries().filter((s) => s.id !== item.id);
+        list.unshift(item);
+        this.saveSummaries(list);
+        break;
+      }
+    }
+    supabaseService.syncRecord(collection, 'upsert', item.id, {
+      local_storage_status: 'downloaded',
+      is_deleted: false,
+    });
   }
 
   // KeyStore

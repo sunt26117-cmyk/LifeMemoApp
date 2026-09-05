@@ -32,6 +32,16 @@ const STORAGE_KEY_SUPABASE_KEY = 'ai_recorder_supabase_key';
 const STORAGE_KEY_SUPABASE_AUTOSYNC = 'ai_recorder_supabase_autosync';
 const STORAGE_KEY_LAST_SYNC = 'ai_recorder_supabase_last_sync';
 
+function getOffloadedIdSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem('ai_recorder_offloaded_ids');
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch {
+    return new Set();
+  }
+}
+
 class SupabaseService {
   private client: SupabaseClient | null = null;
   private status: SyncStatus = {
@@ -41,6 +51,8 @@ class SupabaseService {
     itemCount: 0,
   };
   private listeners: ((status: SyncStatus) => void)[] = [];
+  private syncQueue: Map<string, { table: string; action: 'upsert' | 'delete'; id: string; data?: any }> = new Map();
+  private debounceTimer: any = null;
 
   constructor() {
     this.initClient();
@@ -443,115 +455,140 @@ class SupabaseService {
 
     try {
       const results: any = {};
+      const offloadedSet = getOffloadedIdSet();
 
-      // Pull memories
+      // Pull memories (Ghost prevention: exclude is_deleted and offloaded)
       const { data: mems } = await client
         .from('memories')
         .select('*')
         .order('created_at', { ascending: false });
       if (mems && mems.length > 0) {
-        results.memories = mems.map((m: any) => ({
-          id: m.id,
-          title: m.title || null,
-          content: m.content,
-          tags: m.tags || [],
-          aiSummary: m.ai_summary || null,
-          relatedMediaIds: m.related_media_ids || [],
-          createdAt: m.created_at,
-        }));
+        results.memories = mems
+          .filter((m: any) => !m.is_deleted && !offloadedSet.has(m.id))
+          .map((m: any) => ({
+            id: m.id,
+            title: m.title || null,
+            content: m.content,
+            tags: m.tags || [],
+            aiSummary: m.ai_summary || null,
+            relatedMediaIds: m.related_media_ids || [],
+            photos: m.photos || [],
+            locationName: m.location_name || null,
+            latitude: m.latitude || null,
+            longitude: m.longitude || null,
+            localStorageStatus: 'downloaded',
+            isDeleted: false,
+            createdAt: m.created_at,
+          }));
       }
 
-      // Pull photos
+      // Pull photos (Ghost prevention)
       const { data: pts } = await client
         .from('photos')
         .select('*')
         .order('taken_at', { ascending: false });
       if (pts && pts.length > 0) {
-        results.photos = pts.map((p: any) => ({
-          id: p.id,
-          localPath: p.local_path,
-          takenAt: p.taken_at,
-          aiSummary: p.ai_summary || null,
-          summaryConfirmed: p.summary_confirmed || false,
-          tags: p.tags || [],
-          relatedMemoryIds: p.related_memory_ids || [],
-          locationName: p.metadata?.locationName || null,
-          latitude: p.metadata?.latitude || null,
-          longitude: p.metadata?.longitude || null,
-          metadata: p.metadata || {},
-          createdAt: p.created_at,
-        }));
+        results.photos = pts
+          .filter((p: any) => !p.is_deleted && !offloadedSet.has(p.id))
+          .map((p: any) => ({
+            id: p.id,
+            localPath: p.local_path,
+            takenAt: p.taken_at,
+            aiSummary: p.ai_summary || null,
+            summaryConfirmed: p.summary_confirmed || false,
+            tags: p.tags || [],
+            relatedMemoryIds: p.related_memory_ids || [],
+            locationName: p.metadata?.locationName || null,
+            latitude: p.metadata?.latitude || null,
+            longitude: p.metadata?.longitude || null,
+            metadata: p.metadata || {},
+            localStorageStatus: 'downloaded',
+            isDeleted: false,
+            createdAt: p.created_at,
+          }));
       }
 
-      // Pull notes
+      // Pull notes (Ghost prevention)
       const { data: nts } = await client
         .from('notes')
         .select('*')
         .order('created_at', { ascending: false });
       if (nts && nts.length > 0) {
-        results.notes = nts.map((n: any) => {
-          let tags: string[] = [];
-          try {
-            if (n.ai_organized) tags = JSON.parse(n.ai_organized);
-          } catch (_) {}
-          return {
-            id: n.id,
-            title: n.title || '',
-            content: n.content,
-            tags,
-            isPinned: n.ai_status === 'pinned',
-            createdAt: n.created_at,
-            updatedAt: n.updated_at,
-          };
-        });
+        results.notes = nts
+          .filter((n: any) => !n.is_deleted && !offloadedSet.has(n.id))
+          .map((n: any) => {
+            let tags: string[] = [];
+            try {
+              if (n.ai_organized) tags = JSON.parse(n.ai_organized);
+            } catch (_) {}
+            return {
+              id: n.id,
+              title: n.title || '',
+              content: n.content,
+              tags,
+              isPinned: n.ai_status === 'pinned',
+              localStorageStatus: 'downloaded',
+              isDeleted: false,
+              createdAt: n.created_at,
+              updatedAt: n.updated_at,
+            };
+          });
       }
 
-      // Pull tasks
+      // Pull tasks (Ghost prevention)
       const { data: tsks } = await client
         .from('tasks')
         .select('*')
         .order('created_at', { ascending: false });
       if (tsks && tsks.length > 0) {
-        results.tasks = tsks.map((t: any) => ({
-          id: t.id,
-          title: t.title,
-          description: t.description || '',
-          category: t.category || '健康',
-          priority: t.priority || '中',
-          startTime: t.start_time || null,
-          dueTime: t.due_time || null,
-          reminderTime: t.reminder_time || null,
-          repeatRule: t.repeat_rule || '无',
-          estimatedMinutes: t.estimated_minutes || null,
-          status: t.status || '未开始',
-          steps: t.steps || [],
-          sourceReflectionId: t.source_reflection_id || null,
-          feedback: t.feedback || {},
-          checkInTypeId: t.check_in_type_ids?.[0] || null,
-          createdAt: t.created_at,
-        }));
+        results.tasks = tsks
+          .filter((t: any) => !t.is_deleted && !offloadedSet.has(t.id))
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description || '',
+            category: t.category || '健康',
+            priority: t.priority || '中',
+            startTime: t.start_time || null,
+            dueTime: t.due_time || null,
+            reminderTime: t.reminder_time || null,
+            repeatRule: t.repeat_rule || '无',
+            estimatedMinutes: t.estimated_minutes || null,
+            status: t.status || '未开始',
+            steps: t.steps || [],
+            sourceReflectionId: t.source_reflection_id || null,
+            feedback: t.feedback || {},
+            checkInTypeId: t.check_in_type_ids?.[0] || null,
+            localStorageStatus: 'downloaded',
+            isDeleted: false,
+            createdAt: t.created_at,
+          }));
       }
 
-      // Pull reflections
+      // Pull reflections (Ghost prevention)
       const { data: refs } = await client
         .from('reflections')
         .select('*')
         .order('created_at', { ascending: false });
       if (refs && refs.length > 0) {
-        results.reflections = refs.map((r: any) => ({
-          id: r.id,
-          eventDescription: r.event_description,
-          emotion: r.emotion || '平静',
-          actionTaken: r.action_taken || null,
-          result: r.result || null,
-          aiSummary: r.ai_summary || null,
-          relatedMemoryIds: r.related_memory_ids || [],
-          relatedPhotoIds: r.related_photo_ids || [],
-          relatedTaskIds: r.related_task_ids || [],
-          relatedSummaryIds: r.related_summary_ids || [],
-          isUserConfirmed: r.is_user_confirmed || false,
-          createdAt: r.created_at,
-        }));
+        results.reflections = refs
+          .filter((r: any) => !r.is_deleted && !offloadedSet.has(r.id))
+          .map((r: any) => ({
+            id: r.id,
+            eventDescription: r.event_description,
+            emotion: r.emotion || '平静',
+            actionTaken: r.action_taken || null,
+            result: r.result || null,
+            aiSummary: r.ai_summary || null,
+            relatedMemoryIds: r.related_memory_ids || [],
+            relatedPhotoIds: r.related_photo_ids || [],
+            relatedTaskIds: r.related_task_ids || [],
+            relatedSummaryIds: r.related_summary_ids || [],
+            isUserConfirmed: r.is_user_confirmed || false,
+            localStorageStatus: 'downloaded',
+            isDeleted: false,
+            createdAt: r.created_at,
+          }));
       }
 
       // Pull check-in types
@@ -623,28 +660,33 @@ class SupabaseService {
         }));
       }
 
-      // Pull summaries
+      // Pull summaries (with state machine support)
       const { data: sums } = await client
         .from('summaries')
         .select('*')
         .order('created_at', { ascending: false });
       if (sums && sums.length > 0) {
-        results.summaries = sums.map((s: any) => ({
-          id: s.id,
-          type: s.type,
-          periodStart: s.period_start,
-          periodEnd: s.period_end,
-          content: s.content || '',
-          themes: (s.themes || []).map((name: string) => ({
-            name,
-            direction: '稳定',
-            weight: 1,
-          })),
-          highlights: s.highlights || [],
-          taskSuggestions: s.task_suggestions || [],
-          annualData: s.chart_data || undefined,
-          createdAt: s.created_at,
-        }));
+        results.summaries = sums
+          .filter((s: any) => !s.is_deleted && !offloadedSet.has(s.id))
+          .map((s: any) => ({
+            id: s.id,
+            type: s.type,
+            periodStart: s.period_start,
+            periodEnd: s.period_end,
+            periodKey: s.period_key,
+            isFrozen: s.is_frozen ?? false,
+            version: s.version ?? 1,
+            content: s.content || '',
+            themes: (s.themes || []).map((t: any) =>
+              typeof t === 'string' ? { name: t, direction: '稳定', weight: 1 } : t
+            ),
+            highlights: s.highlights || [],
+            taskSuggestions: s.task_suggestions || [],
+            annualData: s.annual_data || s.chart_data || undefined,
+            localStorageStatus: 'downloaded',
+            isDeleted: false,
+            createdAt: s.created_at,
+          }));
       }
 
       const now = new Date().toISOString();
@@ -693,6 +735,97 @@ class SupabaseService {
     } catch (err) {
       console.warn(`[Supabase Async Sync] Failed for ${table}/${action}:`, err);
     }
+  }
+
+  // 48-Hour Periodic Reconciliation Engine (模块 4)
+  public async reconcile48Hours(): Promise<{ triggered: boolean; message: string }> {
+    const lastTimeRaw = localStorage.getItem('last_reconcile_time');
+    const lastTime = lastTimeRaw ? parseInt(lastTimeRaw, 10) : 0;
+    const now = Date.now();
+    const intervalMs = 48 * 60 * 60 * 1000;
+
+    if (now - lastTime < intervalMs) {
+      return { triggered: false, message: '未到达48小时对齐周期，跳过对齐。' };
+    }
+
+    // 触发 48 小时增量对齐
+    const pullRes = await this.pullAll();
+    localStorage.setItem('last_reconcile_time', String(now));
+    return {
+      triggered: true,
+      message: pullRes.success ? '48小时数据自动对齐成功' : `对齐失败: ${pullRes.message}`,
+    };
+  }
+
+  // Cloud Archive Retrieval (查询云端已瘦身/已归档项，支持重新下载至本地)
+  public async getCloudArchivedItems(): Promise<{
+    memories: any[];
+    photos: any[];
+    notes: any[];
+    tasks: any[];
+    reflections: any[];
+    summaries: any[];
+  }> {
+    const client = this.getClient();
+    if (!client) {
+      return { memories: [], photos: [], notes: [], tasks: [], reflections: [], summaries: [] };
+    }
+
+    const offloadedSet = getOffloadedIdSet();
+    const result: any = {
+      memories: [],
+      photos: [],
+      notes: [],
+      tasks: [],
+      reflections: [],
+      summaries: [],
+    };
+
+    try {
+      const [mRes, pRes, nRes, tRes, rRes, sRes] = await Promise.all([
+        client.from('memories').select('*').eq('is_deleted', false),
+        client.from('photos').select('*').eq('is_deleted', false),
+        client.from('notes').select('*').eq('is_deleted', false),
+        client.from('tasks').select('*').eq('is_deleted', false),
+        client.from('reflections').select('*').eq('is_deleted', false),
+        client.from('summaries').select('*').eq('is_deleted', false),
+      ]);
+
+      if (mRes.data) {
+        result.memories = mRes.data.filter(
+          (m: any) => m.local_storage_status === 'offloaded' || offloadedSet.has(m.id)
+        );
+      }
+      if (pRes.data) {
+        result.photos = pRes.data.filter(
+          (p: any) => p.local_storage_status === 'offloaded' || offloadedSet.has(p.id)
+        );
+      }
+      if (nRes.data) {
+        result.notes = nRes.data.filter(
+          (n: any) => n.local_storage_status === 'offloaded' || offloadedSet.has(n.id)
+        );
+      }
+      if (tRes.data) {
+        result.tasks = tRes.data.filter(
+          (t: any) => t.local_storage_status === 'offloaded' || offloadedSet.has(t.id)
+        );
+      }
+      if (rRes.data) {
+        result.reflections = rRes.data.filter(
+          (r: any) => r.local_storage_status === 'offloaded' || offloadedSet.has(r.id)
+        );
+      }
+      if (sRes.data) {
+        result.summaries = sRes.data.filter(
+          (s: any) => s.local_storage_status === 'offloaded' || offloadedSet.has(s.id)
+        );
+      }
+    } catch (e) {
+      console.warn('[getCloudArchivedItems] Failed:', e);
+    }
+
+    return result;
   }
 }
 

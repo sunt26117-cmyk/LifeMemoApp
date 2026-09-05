@@ -1,9 +1,52 @@
 @import "tailwindcss";
 
+:root,
+[data-theme="sky"] {
+  --theme-bg: #EAF0F7;
+  --theme-shell: #F4F8FC;
+  --theme-primary: #4A90D9;
+  --theme-primary-hover: #3B7EC4;
+  --theme-primary-light: #EBF2FA;
+  --theme-accent: #5AA1E8;
+  --theme-border: #DDE8F4;
+  --theme-card-bg: #FFFFFF;
+  --theme-text-main: #1E293B;
+  --theme-text-muted: #64748B;
+}
+
+[data-theme="warm"] {
+  --theme-bg: #F4EFEA;
+  --theme-shell: #FAF6F0;
+  --theme-primary: #B86B35;
+  --theme-primary-hover: #9E5828;
+  --theme-primary-light: #F5ECE0;
+  --theme-accent: #D27B42;
+  --theme-border: #EADFCF;
+  --theme-card-bg: #FFFDF9;
+  --theme-text-main: #3D332A;
+  --theme-text-muted: #7D6F63;
+}
+
+[data-theme="forest"] {
+  --theme-bg: #E7EFE9;
+  --theme-shell: #F3F8F4;
+  --theme-primary: #3B7D57;
+  --theme-primary-hover: #2E6645;
+  --theme-primary-light: #EAF3EC;
+  --theme-accent: #4DA071;
+  --theme-border: #D5E3D8;
+  --theme-card-bg: #FAFDFB;
+  --theme-text-main: #243328;
+  --theme-text-muted: #5E7365;
+}
+
 @layer base {
   body {
-    background-color: #F5F5F5;
-    color: #334155;
+    background-color: var(--theme-bg, #F4F7FB);
+    color: var(--theme-text-main, #334155);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-tap-highlight-color: transparent;
   }
 }
+

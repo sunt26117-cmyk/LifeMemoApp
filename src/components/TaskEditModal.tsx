@@ -1,5 +1,5 @@
 // src/components/TaskEditModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { RepeatRule, Task, TaskCategory, TaskPriority, TaskStep } from '../types';
 import { useApp } from '../context/AppContext';
@@ -21,14 +21,16 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   isOpen,
   task,
   initialTitle = '',
-  initialCategory = '项目',
+  initialCategory,
   onClose,
 }) => {
-  const { addTask, updateTask, checkInTypes } = useApp();
+  const { addTask, updateTask, checkInTypes, taskCategories, addTaskCategory } = useApp();
 
   const [title, setTitle] = useState(task?.title || initialTitle);
   const [description, setDescription] = useState(task?.description || '');
-  const [category, setCategory] = useState<TaskCategory>(task?.category || initialCategory);
+  const [category, setCategory] = useState<TaskCategory>(
+    task?.category || initialCategory || taskCategories[0] || '生活日常'
+  );
   const [priority, setPriority] = useState<TaskPriority>(task?.priority || '中');
   const [dueTime, setDueTime] = useState(task?.dueTime ? task.dueTime.slice(0, 16) : '');
   const [repeatRule, setRepeatRule] = useState<RepeatRule>(task?.repeatRule || '无');
@@ -37,8 +39,26 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   const [steps, setSteps] = useState<TaskStep[]>(task?.steps || []);
   const [newStepText, setNewStepText] = useState('');
   const [decomposing, setDecomposing] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
+
+  // Synchronize category if list loaded
+  useEffect(() => {
+    if (!category && taskCategories.length > 0) {
+      setCategory(taskCategories[0]);
+    }
+  }, [taskCategories, category]);
 
   if (!isOpen) return null;
+
+  const handleCreateCustomCategory = () => {
+    const trimmed = customCategoryInput.trim();
+    if (!trimmed) return;
+    addTaskCategory(trimmed);
+    setCategory(trimmed);
+    setCustomCategoryInput('');
+    setIsAddingCategory(false);
+  };
 
   const handleAddStep = () => {
     if (newStepText.trim()) {
@@ -147,18 +167,63 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">所属分类</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as TaskCategory)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-600">所属分类</label>
+                {!isAddingCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCategory(true)}
+                    className="text-[10px] text-[#4A90D9] hover:underline"
+                  >
+                    + 自定义
+                  </button>
+                )}
+              </div>
+
+              {isAddingCategory ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="新分类名称"
+                    value={customCategoryInput}
+                    onChange={(e) => setCustomCategoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateCustomCategory();
+                      }
+                    }}
+                    className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCustomCategory}
+                    className="px-2 py-2 bg-[#57B8E3] text-white text-[11px] rounded-xl shrink-0"
+                  >
+                    添加
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingCategory(false)}
+                    className="px-1.5 py-2 text-slate-400 hover:text-slate-600 text-[11px] shrink-0"
+                  >
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as TaskCategory)}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                >
+                  {Array.from(new Set([...taskCategories, category].filter(Boolean))).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>
@@ -206,7 +271,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">预估用时（分钟）</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">预估用时</label>
               <input
                 type="number"
                 min={5}

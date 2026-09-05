@@ -16,9 +16,12 @@ import { NoteEditModal } from './components/NoteEditModal';
 import { PhotoEditModal } from './components/PhotoEditModal';
 import { BiometricModal } from './components/BiometricModal';
 import { SettingsModal } from './components/SettingsModal';
+import { PhotoFullscreenViewer } from './components/PhotoFullscreenViewer';
+import { getThemeColors } from './utils/themeStyles';
 
 export const App: React.FC = () => {
-  const { activeTab, changeTaskStatus, isBiometricLocked } = useApp();
+  const { activeTab, changeTaskStatus, isBiometricLocked, praiseToast, theme } = useApp();
+  const themeColors = getThemeColors(theme);
 
   const {
     quickActionOpen,
@@ -61,10 +64,20 @@ export const App: React.FC = () => {
   } = useAppModals({ changeTaskStatus, isBiometricLocked });
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC] text-slate-800 font-sans antialiased selection:bg-sky-200">
-      <div className="max-w-md mx-auto sm:max-w-xl min-h-screen bg-white shadow-xl relative flex flex-col">
+    <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${themeColors.outerBg}`}>
+      <div className={`max-w-md mx-auto sm:max-w-xl min-h-screen shadow-xl relative flex flex-col transition-colors duration-300 ${themeColors.innerBg}`}>
         {/* Navigation & Top Bar */}
         <Navigation onQuickAction={() => setQuickActionOpen(true)} />
+
+        {/* 1-Second Praise Encouragement Toast */}
+        {praiseToast && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-200">
+            <div className="bg-slate-900/90 backdrop-blur-md text-white text-xs font-semibold px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 border border-white/20">
+              <span className="text-sm">🎉</span>
+              <span>{praiseToast}</span>
+            </div>
+          </div>
+        )}
 
         {/* Primary Views */}
         <main className="flex-1 p-4 overflow-y-auto">
@@ -75,7 +88,6 @@ export const App: React.FC = () => {
               onOpenTaskStatus={handleOpenTaskStatus}
               onOpenMemoryCreate={handleOpenMemoryCreate}
               onOpenNoteCreate={handleOpenNoteCreate}
-              onOpenPhotoCreate={handleOpenPhotoCreate}
               onOpenReflectionCreate={handleOpenReflectionCreate}
               onUnlockBiometric={() => setBiometricModalOpen(true)}
             />
@@ -116,7 +128,6 @@ export const App: React.FC = () => {
           onClose={() => setQuickActionOpen(false)}
           onOpenMemoryCreate={handleOpenMemoryCreate}
           onOpenNoteCreate={handleOpenNoteCreate}
-          onOpenPhotoCreate={handleOpenPhotoCreate}
           onOpenTaskCreate={() => handleOpenTaskCreate()}
           onOpenReflectionCreate={handleOpenReflectionCreate}
         />
@@ -175,7 +186,9 @@ export const App: React.FC = () => {
         />
 
         <SettingsModal />
+        <PhotoFullscreenViewer />
       </div>
+
     </div>
   );
 };

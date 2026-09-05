@@ -8,18 +8,19 @@ import {
   Settings,
   Plus,
   Cloud,
-  CloudCheck,
   RefreshCw,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabaseService } from '../services/supabaseService';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface NavigationProps {
   onQuickAction: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
-  const { activeTab, setActiveTab, setSettingsOpen, syncStatus } = useApp();
+  const { activeTab, setActiveTab, setSettingsOpen, syncStatus, theme } = useApp();
+  const themeColors = getThemeColors(theme);
 
   const isConfigured = supabaseService.isConfigured();
 
@@ -33,14 +34,18 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
   return (
     <>
       {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-xs px-4 py-3 flex items-center justify-between">
+      <header
+        className={`sticky top-0 z-30 backdrop-blur-md border-b shadow-xs px-4 py-3 flex items-center justify-between transition-colors ${themeColors.headerBg}`}
+      >
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#57B8E3] to-[#AEE3F5] flex items-center justify-center text-white font-bold shadow-xs">
-            忆
+          <div
+            className={`w-8 h-8 rounded-xl bg-gradient-to-tr ${themeColors.logoGradient} flex items-center justify-center text-white font-bold shadow-xs text-sm transition-all`}
+          >
+            限
           </div>
           <div>
             <h1 className="text-base font-semibold text-slate-800 leading-tight flex items-center gap-1.5">
-              <span>AI 生活记录系统</span>
+              <span>人生不设限</span>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
@@ -75,7 +80,7 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
           <button
             id="btn-quick-create"
             onClick={onQuickAction}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#57B8E3] hover:bg-[#46a5d0] text-white text-xs font-medium rounded-full shadow-xs transition-colors"
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full shadow-xs transition-all ${themeColors.actionBtn}`}
           >
             <Plus className="w-3.5 h-3.5" />
             <span>记录</span>
@@ -83,8 +88,8 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
           <button
             id="btn-open-settings"
             onClick={() => setSettingsOpen(true)}
-            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
-            title="系统设置"
+            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 rounded-full transition-colors"
+            title="系统设置与偏好"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -92,7 +97,9 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
       </header>
 
       {/* Bottom 4-Tab Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-100 py-1.5 px-6 flex items-center justify-around shadow-lg max-w-md mx-auto sm:max-w-xl">
+      <nav
+        className={`fixed bottom-0 left-0 right-0 z-30 backdrop-blur-md border-t py-1.5 px-6 flex items-center justify-around shadow-lg max-w-md mx-auto sm:max-w-xl transition-colors ${themeColors.navBg}`}
+      >
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -103,13 +110,13 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
               onClick={() => setActiveTab(tab.id)}
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all ${
                 isActive
-                  ? 'text-[#57B8E3] font-semibold scale-105'
-                  : 'text-[#B9C4D6] hover:text-slate-600'
+                  ? `${themeColors.activeTabText} font-semibold scale-105`
+                  : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               <div
                 className={`p-1 rounded-xl transition-colors ${
-                  isActive ? 'bg-sky-50' : 'bg-transparent'
+                  isActive ? themeColors.activeTabBg : 'bg-transparent'
                 }`}
               >
                 <Icon className="w-5 h-5" />
