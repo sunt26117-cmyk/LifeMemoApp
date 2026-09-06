@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       # 3. 设置 Java 17 环境
@@ -34,10 +34,9 @@ jobs:
           npm install
           npm run build --if-present
 
-      # 5. 同步前端资源到安卓工程
+     # 5. 同步前端资源到安卓工程
       - name: Sync Capacitor Android
-        run: |
-          npx cap sync android || echo "Sync skipped or already synced"
+        run: npx cap sync android
 
       # 6. 赋予 gradlew 执行权限
       - name: Grant execute permission for gradlew
