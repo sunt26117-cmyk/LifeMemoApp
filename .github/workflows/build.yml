@@ -1,0 +1,38 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "**" ]         # 任何分支推送时触发
+  workflow_dispatch:           # 允许在网页上点击按钮手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取代码
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # 2. 配置 JDK 环境（目前主流 Android 项目一般用 Java 17）
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # 3. 赋予 gradlew 脚本执行权限
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 4. 执行打包命令（打 Debug 包，不需要配置复杂的签名证书即可在手机安装）
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+
+      # 5. 上传生成的 APK，供你下载
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
