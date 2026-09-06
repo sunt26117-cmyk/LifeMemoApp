@@ -4,7 +4,7 @@ import { X, Sparkles, Plus, MapPin, Camera, Trash2, Loader2, Image as ImageIcon 
 import { Memory } from '../types';
 import { useApp } from '../context/AppContext';
 import { AiService } from '../services/aiService';
-import { getCityNameFromCoords } from '../utils/geoUtil';
+import { getCityNameFromCoords, requestAndGetCurrentPosition } from '../utils/geoUtil';
 
 interface MemoryEditModalProps {
   isOpen: boolean;
@@ -49,35 +49,25 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
     setTags(tags.filter((item) => item !== t));
   };
 
-  const handleFetchLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('当前环境未启用地理位置，请点击下方快捷城市');
-      return;
-    }
+  const handleFetchLocation = async () => {
     setLocating(true);
     setLocationError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = parseFloat(pos.coords.latitude.toFixed(4));
-        const lng = parseFloat(pos.coords.longitude.toFixed(4));
-        setLatitude(lat);
-        setLongitude(lng);
-        try {
-          const cityName = await getCityNameFromCoords(lat, lng);
-          setLocationName(cityName);
-        } catch {
-          setLocationName('成都市');
-        } finally {
-          setLocating(false);
-        }
-      },
-      (err) => {
-        console.warn('Geolocation failed:', err);
-        setLocating(false);
-        setLocationError('未能获取到实时GPS，可点击下方城市快捷填入');
-      },
-      { timeout: 6000, enableHighAccuracy: true }
-    );
+    try {
+      const coords = await requestAndGetCurrentPosition();
+      setLatitude(coords.latitude);
+      setLongitude(coords.longitude);
+      try {
+        const cityName = await getCityNameFromCoords(coords.latitude, coords.longitude);
+        setLocationName(cityName);
+      } catch {
+        setLocationName('当前定位城市');
+      }
+    } catch (err: any) {
+      console.warn('Geolocation failed:', err);
+      setLocationError(err?.message || '未能获取到实时GPS，可点击下方城市快捷填入');
+    } finally {
+      setLocating(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

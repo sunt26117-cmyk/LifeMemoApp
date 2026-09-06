@@ -1,4 +1,65 @@
 // src/utils/geoUtil.ts
+import { Geolocation } from '@capacitor/geolocation';
+
+export interface DeviceCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * Requests device location permission and gets current coordinates.
+ * Supports Android Capacitor native permission flow and Web/PWA fallback.
+ */
+export async function requestAndGetCurrentPosition(): Promise<DeviceCoordinates> {
+  // Strategy 1: Capacitor Native Geolocation (Triggers Android native runtime permission prompt)
+  try {
+    const permStatus = await Geolocation.checkPermissions();
+    if (permStatus.location !== 'granted') {
+      const reqRes = await Geolocation.requestPermissions();
+      if (reqRes.location !== 'granted') {
+        throw new Error('未获得位置定位权限，请在系统设置中开启');
+      }
+    }
+    const pos = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 8000,
+    });
+    return {
+      latitude: parseFloat(pos.coords.latitude.toFixed(4)),
+      longitude: parseFloat(pos.coords.longitude.toFixed(4)),
+    };
+  } catch (capErr) {
+    console.warn('Capacitor native geolocation failed or not in native runtime:', capErr);
+  }
+
+  // Strategy 2: Browser standard Geolocation
+  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({
+            latitude: parseFloat(pos.coords.latitude.toFixed(4)),
+            longitude: parseFloat(pos.coords.longitude.toFixed(4)),
+          });
+        },
+        (err) => {
+          let msg = '未能获取到实时GPS';
+          if (err.code === 1) {
+            msg = '位置权限被拒绝，请在手机设置或浏览器权限中允许访问位置';
+          } else if (err.code === 2) {
+            msg = '位置不可用，请确保GPS已开启';
+          } else if (err.code === 3) {
+            msg = '定位请求超时';
+          }
+          reject(new Error(msg));
+        },
+        { timeout: 8000, enableHighAccuracy: true }
+      );
+    });
+  }
+
+  throw new Error('当前环境不支持地理位置获取');
+}
 
 /**
  * Reverse geocodes latitude and longitude into a clean city / district name (e.g., "成都市", "北京市海淀区").

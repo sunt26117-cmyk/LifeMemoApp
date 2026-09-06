@@ -59,6 +59,15 @@ export const TodayView: React.FC<TodayViewProps> = ({
   const WEEK_DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const weekDayStr = WEEK_DAYS[today.getDay()];
 
+  // Calculate year elapsed metrics (days passed this year with large typography)
+  const isLeapYear = (year: number) => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const totalDaysInYear = isLeapYear(today.getFullYear()) ? 366 : 365;
+  const startOfYearUtc = new Date(Date.UTC(today.getFullYear(), 0, 1));
+  const currentUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const daysPassed = Math.round((currentUtc.getTime() - startOfYearUtc.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const remainingDays = Math.max(0, totalDaysInYear - daysPassed);
+  const yearProgressPercent = ((daysPassed / totalDaysInYear) * 100).toFixed(1);
+
   // Today's tasks (active or due today or unstarted)
   const todayTasks = tasks.filter((t) => {
     if (t.status === '进行中') return true;
@@ -96,15 +105,49 @@ export const TodayView: React.FC<TodayViewProps> = ({
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold mt-2">
-            {today.getMonth() + 1}月{today.getDate()}日，保持节奏
-          </h2>
-          <p className="text-xs text-white/90 mt-1">
-            小事记录，日常笃行。将行动沉淀为不可逆的行为成长证据。
-          </p>
+          <div className="flex items-start justify-between gap-3 mt-3">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold">
+                {today.getMonth() + 1}月{today.getDate()}日，保持节奏
+              </h2>
+              <p className="text-xs text-white/90 mt-1 max-w-[210px] sm:max-w-xs leading-relaxed">
+                小事记录，日常笃行。将行动沉淀为不可逆的行为成长证据。
+              </p>
+            </div>
+
+            {/* 年度时光流逝展示：用较大的数字字体显示今年已经过去了多少天 */}
+            <div className="shrink-0 bg-white/15 backdrop-blur-xs border border-white/25 rounded-2xl px-3.5 py-2 text-center shadow-xs flex flex-col items-center justify-center min-w-[86px]">
+              <span className="text-[10px] text-white/80 font-medium tracking-wide">今年已过</span>
+              <div className="flex items-baseline justify-center gap-0.5 my-0.5">
+                <span className="text-3xl sm:text-4xl font-black tracking-tight font-mono leading-none drop-shadow-xs">
+                  {daysPassed}
+                </span>
+                <span className="text-xs text-white/90 font-medium">天</span>
+              </div>
+              <div className="text-[10px] text-white/75 flex items-center justify-center gap-1">
+                <span>{yearProgressPercent}%</span>
+                <span>·</span>
+                <span>余{remainingDays}天</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 年度时光流逝进度条 */}
+          <div className="mt-3 pt-2.5 border-t border-white/15">
+            <div className="flex items-center justify-between text-[10px] text-white/80 mb-1">
+              <span>{today.getFullYear()} 年度进程</span>
+              <span>第 {daysPassed} / {totalDaysInYear} 天 ({yearProgressPercent}%)</span>
+            </div>
+            <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-white/90 h-full rounded-full transition-all duration-500 shadow-xs"
+                style={{ width: `${yearProgressPercent}%` }}
+              />
+            </div>
+          </div>
 
           {/* Quick Metrics */}
-          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/20 text-center">
+          <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-white/15 text-center">
             <div>
               <span className="text-[11px] text-white/80 block">待办进度</span>
               <span className="text-base font-bold">

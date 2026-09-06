@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Link2,
+  Lightbulb,
 } from 'lucide-react';
 import { Emotion, Reflection, ReflectionSummary } from '../types';
 import { useApp } from '../context/AppContext';
@@ -52,7 +53,41 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
   const [generating, setGenerating] = useState(false);
   const [validationViolations, setValidationViolations] = useState<{ rule: string; detail: string }[]>([]);
 
+  // Standalone Key Suggestion state
+  const [keySuggestion, setKeySuggestion] = useState<string | null>(null);
+  const [generatingKeySuggestion, setGeneratingKeySuggestion] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleGenerateKeySuggestion = async () => {
+    if (!eventDescription.trim()) return;
+    setGeneratingKeySuggestion(true);
+    try {
+      const pack = buildContextPack({
+        eventDescription,
+        emotion,
+        actionTaken,
+        result,
+        tags: [emotion],
+        memories,
+        photos,
+        tasks,
+        summaries,
+      });
+      const suggestion = await AiService.generateKeySuggestion({
+        eventDescription,
+        emotion,
+        actionTaken,
+        result,
+        contextPack: pack,
+      });
+      setKeySuggestion(suggestion);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeneratingKeySuggestion(false);
+    }
+  };
 
   const handleGenerateAi = async () => {
     if (!eventDescription.trim()) return;
@@ -230,22 +265,70 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
               onChange={(e) => setLessonsLearned(e.target.value)}
               className="w-full text-xs p-2.5 bg-white border border-amber-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-amber-400"
             />
+
+            {/* Standalone AI Key Suggestion (自动放在总结经验窗口下面；当生成深度分析报告后，自动消失) */}
+            {!aiSummary && keySuggestion && (
+              <div className="mt-2.5 p-3 bg-white/90 rounded-xl border border-amber-300 shadow-2xs space-y-2 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs">
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>AI 关键建议与盲点提点</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const addition = `【AI建议】：${keySuggestion}`;
+                        if (!lessonsLearned.trim()) {
+                          setLessonsLearned(addition);
+                        } else if (!lessonsLearned.includes(keySuggestion)) {
+                          setLessonsLearned(`${lessonsLearned}\n${addition}`);
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md transition-colors"
+                    >
+                      + 采纳填入经验
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setKeySuggestion(null)}
+                      className="p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
+                      title="关闭建议"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-950 leading-relaxed font-medium bg-amber-50/60 p-2.5 rounded-lg border border-amber-200/70">
+                  {keySuggestion}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* AI Trigger */}
-          <div className="pt-1">
+          {/* AI Triggers: 拆分为「AI 关键建议」和「生成 AI 深度分析」两个独立按钮 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleGenerateKeySuggestion}
+              disabled={generatingKeySuggestion || !eventDescription.trim()}
+              className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
+            >
+              <Lightbulb className="w-4 h-4" />
+              <span>{generatingKeySuggestion ? '正在提炼关键建议...' : '💡 获取 AI 关键建议'}</span>
+            </button>
             <button
               type="button"
               onClick={handleGenerateAi}
               disabled={generating || !eventDescription.trim()}
-              className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
+              className="py-2.5 px-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{generating ? '正在结合历史上下文并执行 V1-V5 校验...' : '生成 AI 关键建议与深度分析'}</span>
+              <span>{generating ? '正在生成深度分析报告...' : '✨ 生成 AI 深度分析'}</span>
             </button>
           </div>
 
-          {/* Validation Status */}
+          {/* Validation Status & Deep Analysis Report */}
           {aiSummary && (
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
@@ -275,37 +358,6 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
                   ))}
                 </div>
               )}
-
-              {/* AI Key Suggestion Card (短而精，提点忽略的细节) */}
-              <div className="p-3 bg-gradient-to-br from-indigo-50/90 to-purple-50/90 rounded-xl border border-indigo-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-indigo-950">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span className="text-xs font-bold">
-                      AI 关键建议与盲点提点（短而精）
-                    </span>
-                  </div>
-                  {aiSummary.keySuggestion && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const addition = `【AI盲点提点】：${aiSummary.keySuggestion}`;
-                        if (!lessonsLearned.trim()) {
-                          setLessonsLearned(addition);
-                        } else if (!lessonsLearned.includes(aiSummary.keySuggestion!)) {
-                          setLessonsLearned(`${lessonsLearned}\n${addition}`);
-                        }
-                      }}
-                      className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white px-2 py-0.5 rounded-md border border-indigo-200 shadow-2xs transition-colors"
-                    >
-                      + 补充到经验总结
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-indigo-950 leading-relaxed font-medium bg-white/90 p-2.5 rounded-lg border border-indigo-100/90">
-                  {aiSummary.keySuggestion || aiSummary.improvementPoints || '关注引发事件的核心诱因与时间节点，设立前置的防范阻断机制。'}
-                </p>
-              </div>
 
               {/* 4 AI Core Analysis Fields (Editable) */}
               <div className="space-y-2.5 pt-2 border-t border-slate-200">

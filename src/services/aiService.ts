@@ -99,6 +99,21 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
     return { summary: fallbackSummary, isFallback: true };
   }
 
+  static async generateKeySuggestion(params: {
+    eventDescription: string;
+    emotion?: string | null;
+    actionTaken?: string | null;
+    result?: string | null;
+    contextPack: ContextPack;
+  }): Promise<string> {
+    const { summary } = await this.generateReflection(params);
+    return (
+      summary.keySuggestion ||
+      summary.improvementPoints ||
+      '关注引发事件的核心诱因与时间节点，设立前置的防范阻断机制。'
+    );
+  }
+
   private static generateCompliantFallback(params: {
     eventDescription: string;
     emotion?: string | null;

@@ -29,17 +29,28 @@ export const MascotSpeechBubble: React.FC<MascotSpeechBubbleProps> = ({
         className={`relative z-20 pointer-events-auto cursor-pointer select-none transition-all duration-300 animate-bubble-pop ${className}`}
         title="点击关闭气泡"
       >
-        <div className="bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-lg border border-white/20 flex items-center gap-1.5 text-xs max-w-[210px] text-center font-medium leading-relaxed">
-          {isSleeping ? (
-            <Moon className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-          )}
-          <span className="line-clamp-2">{text}</span>
-        </div>
+        {/* 顶部指示标，指向顶栏小精灵 */}
+        <div className="w-0 h-0 border-x-5 border-x-transparent border-b-5 border-b-slate-900/95 mx-auto -mb-[1px]" />
 
-        {/* 底部居中小三角指示标 */}
-        <div className="w-0 h-0 border-x-4 border-x-transparent border-t-5 border-t-slate-900/90 mx-auto -mt-[1px]" />
+        <div className="bg-slate-900/95 text-white backdrop-blur-md px-3.5 py-2.5 rounded-2xl shadow-xl border border-white/20 flex items-start gap-2 text-xs max-w-[290px] sm:max-w-xs font-medium leading-relaxed">
+          {isSleeping ? (
+            <Moon className="w-4 h-4 text-indigo-300 shrink-0 mt-0.5" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+          )}
+          <span className="flex-1 break-words leading-relaxed text-slate-100">{text}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss?.();
+            }}
+            className="text-slate-400 hover:text-white shrink-0 p-0.5 -mr-1"
+            title="关闭气泡"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -48,7 +59,7 @@ export const MascotSpeechBubble: React.FC<MascotSpeechBubbleProps> = ({
   return (
     <div
       onClick={onDismiss}
-      className={`relative z-30 pointer-events-auto cursor-pointer select-none transition-all duration-300 animate-bubble-pop max-w-[280px] sm:max-w-xs ${className}`}
+      className={`relative z-30 pointer-events-auto cursor-pointer select-none transition-all duration-300 animate-bubble-pop max-w-[320px] sm:max-w-sm w-full mx-auto ${className}`}
       title="点击任意处跳过问候"
     >
       <div className="bg-white/95 backdrop-blur-md px-4 py-3.5 rounded-2xl shadow-xl border border-blue-100 text-slate-800 text-center relative">
@@ -76,7 +87,7 @@ export const MascotSpeechBubble: React.FC<MascotSpeechBubbleProps> = ({
         </div>
 
         {/* 问候文案 */}
-        <p className="text-sm font-medium text-slate-700 leading-relaxed tracking-normal">
+        <p className="text-sm font-medium text-slate-700 leading-relaxed tracking-normal break-words text-left sm:text-center">
           {text}
         </p>
 
