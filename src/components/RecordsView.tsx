@@ -41,13 +41,13 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
   const themeColors = getThemeColors(theme);
 
-  const [activeSubTab, setActiveSubTab] = useState<'all' | 'memories' | 'notes' | 'photos'>('all');
+  const [activeSubTab, setActiveSubTab] = useState<'all' | 'memories' | 'notes'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // Dual-track deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: 'photo' | 'memory' | 'note';
+    type: 'memory' | 'note';
     id: string;
     title: string;
     description?: string;
@@ -117,9 +117,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         <div className={`flex gap-1 p-1 ${themeColors.segmentBg} rounded-2xl`}>
           {[
             { id: 'all', label: '全部' },
-            { id: 'memories', label: `文字 (${memories.length})` },
+            { id: 'memories', label: `记录 (${memories.length})` },
             { id: 'notes', label: `便签 (${notes.length})` },
-            { id: 'photos', label: `照片 (${photos.length})` },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -142,15 +141,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               onClick={onOpenNoteCreate}
               className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs transition-colors"
               title="新建便签"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          )}
-          {activeSubTab === 'photos' && (
-            <button
-              onClick={onOpenMemoryCreate}
-              className={`p-2 ${themeColors.actionBtn} text-white rounded-xl shadow-xs transition-colors flex items-center gap-1 text-xs font-medium`}
-              title="写记录配图"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -218,24 +208,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
       {/* Content Stream */}
       <div className="space-y-3">
-        {(activeSubTab === 'all' || activeSubTab === 'photos') && (
-          <PhotoGrid
-            photos={filteredPhotos}
-            activeSubTab={activeSubTab}
-            onViewAll={() => setActiveSubTab('photos')}
-            onEdit={onOpenPhotoEdit}
-            onDelete={(id) => {
-              const p = photos.find((x) => x.id === id);
-              setDeleteTarget({
-                type: 'photo',
-                id,
-                title: '删除照片记录',
-                description: p?.aiSummary || '包含照片文件与AI解析摘要',
-              });
-            }}
-          />
-        )}
-
         {(activeSubTab === 'all' || activeSubTab === 'notes') && filteredNotes.length > 0 && (
           <div className="space-y-2">
             {activeSubTab === 'all' && (

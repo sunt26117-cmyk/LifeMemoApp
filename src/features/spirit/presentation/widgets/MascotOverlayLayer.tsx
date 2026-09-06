@@ -6,9 +6,13 @@ import { MascotSpeechBubble } from './MascotSpeechBubble';
 
 interface MascotOverlayLayerProps {
   theme?: string;
+  isBusy?: boolean;
 }
 
-export const MascotOverlayLayer: React.FC<MascotOverlayLayerProps> = ({ theme = 'sky' }) => {
+export const MascotOverlayLayer: React.FC<MascotOverlayLayerProps> = ({
+  theme = 'sky',
+  isBusy = false,
+}) => {
   const {
     state,
     expression,
@@ -20,12 +24,13 @@ export const MascotOverlayLayer: React.FC<MascotOverlayLayerProps> = ({ theme = 
     isEnabled,
     handleMascotClick,
     handleBubbleDismiss,
-  } = useMascotController();
+  } = useMascotController({ isBusy });
 
   if (!isEnabled || state === 'hidden') {
     return null;
   }
 
+  const effectiveBubbleText = isBusy ? null : bubbleText;
   const isCenterGreeting = state === 'entering' || state === 'greeting';
   const isDocking = state === 'docking';
 
@@ -63,7 +68,7 @@ export const MascotOverlayLayer: React.FC<MascotOverlayLayerProps> = ({ theme = 
             - 入场模式：位于大精灵头顶
             - 顶栏模式：位于精灵下方，避免被状态栏或顶端屏幕切掉
           */}
-          {bubbleText && (
+          {effectiveBubbleText && (
             <div
               className={`absolute pointer-events-auto z-50 transition-all ${
                 isCenterGreeting
@@ -72,7 +77,7 @@ export const MascotOverlayLayer: React.FC<MascotOverlayLayerProps> = ({ theme = 
               }`}
             >
               <MascotSpeechBubble
-                text={bubbleText}
+                text={effectiveBubbleText}
                 variant={bubbleVariant}
                 timeBucket={timeBucket}
                 isSleeping={isSleeping}

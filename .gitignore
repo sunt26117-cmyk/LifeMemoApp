@@ -1,4 +1,4 @@
-﻿# Miscellaneous
+# Miscellaneous
 *.class
 *.log
 *.pyc
@@ -45,13 +45,3 @@ app.*.map.json
 # 环境变量（含密钥，不入库）
 .env
 *.apk
-
-# Node 依赖与构建产物
-node_modules/
-dist/
-
-# Capacitor sync 生成的产物（每次构建自动重新生成）
-/android/app/src/main/assets/public/
-/android/app/src/main/assets/capacitor.config.json
-/android/app/src/main/assets/capacitor.plugins.json
-

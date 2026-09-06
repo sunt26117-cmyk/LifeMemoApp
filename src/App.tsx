@@ -178,62 +178,90 @@ export const App: React.FC = () => {
           onOpenReflectionCreate={handleOpenReflectionCreate}
         />
 
-        {/* Global Modals */}
-        <TaskEditModal
-          isOpen={taskModalOpen}
-          task={editingTask}
-          initialTitle={initialTaskTitle}
-          initialCategory={initialTaskCategory}
-          onClose={() => setTaskModalOpen(false)}
-        />
+        {/* Global Modals - Conditionally rendered to guarantee completely clean initial state */}
+        {taskModalOpen && (
+          <TaskEditModal
+            isOpen={taskModalOpen}
+            task={editingTask}
+            initialTitle={initialTaskTitle}
+            initialCategory={initialTaskCategory}
+            onClose={() => setTaskModalOpen(false)}
+          />
+        )}
 
-        <TaskStatusModal
-          isOpen={statusModalOpen}
-          task={statusTask}
-          targetStatus={targetStatus}
-          onClose={() => setStatusModalOpen(false)}
-          onConfirm={handleConfirmTaskStatus}
-        />
+        {statusModalOpen && (
+          <TaskStatusModal
+            isOpen={statusModalOpen}
+            task={statusTask}
+            targetStatus={targetStatus}
+            onClose={() => setStatusModalOpen(false)}
+            onConfirm={handleConfirmTaskStatus}
+          />
+        )}
 
-        <ReflectionEditModal
-          isOpen={reflectionModalOpen}
-          reflection={editingReflection}
-          onClose={() => setReflectionModalOpen(false)}
-          onOpenTaskCreate={(title) => {
-            setReflectionModalOpen(false);
-            handleOpenTaskCreate(title);
-          }}
-        />
+        {reflectionModalOpen && (
+          <ReflectionEditModal
+            isOpen={reflectionModalOpen}
+            reflection={editingReflection}
+            onClose={() => setReflectionModalOpen(false)}
+            onOpenTaskCreate={(title) => {
+              setReflectionModalOpen(false);
+              handleOpenTaskCreate(title);
+            }}
+          />
+        )}
 
-        <MemoryEditModal
-          isOpen={memoryModalOpen}
-          memory={editingMemory}
-          onClose={() => setMemoryModalOpen(false)}
-        />
+        {memoryModalOpen && (
+          <MemoryEditModal
+            isOpen={memoryModalOpen}
+            memory={editingMemory}
+            onClose={() => setMemoryModalOpen(false)}
+          />
+        )}
 
-        <NoteEditModal
-          isOpen={noteModalOpen}
-          note={editingNote}
-          onClose={() => setNoteModalOpen(false)}
-        />
+        {noteModalOpen && (
+          <NoteEditModal
+            isOpen={noteModalOpen}
+            note={editingNote}
+            onClose={() => setNoteModalOpen(false)}
+          />
+        )}
 
-        <PhotoEditModal
-          isOpen={photoModalOpen}
-          photo={editingPhoto}
-          onClose={() => setPhotoModalOpen(false)}
-        />
+        {photoModalOpen && (
+          <PhotoEditModal
+            isOpen={photoModalOpen}
+            photo={editingPhoto}
+            onClose={() => setPhotoModalOpen(false)}
+          />
+        )}
 
-        <BiometricModal
-          isOpen={biometricModalOpen}
-          onClose={() => setBiometricModalOpen(false)}
-          onSuccess={() => {
-            setBiometricModalOpen(false);
-          }}
-        />
+        {biometricModalOpen && (
+          <BiometricModal
+            isOpen={biometricModalOpen}
+            onClose={() => setBiometricModalOpen(false)}
+            onSuccess={() => {
+              setBiometricModalOpen(false);
+            }}
+          />
+        )}
 
         <SettingsModal />
         <PhotoFullscreenViewer />
-        <MascotOverlayLayer theme={theme} />
+        <MascotOverlayLayer
+          theme={theme}
+          isBusy={
+            quickActionOpen ||
+            taskModalOpen ||
+            statusModalOpen ||
+            reflectionModalOpen ||
+            memoryModalOpen ||
+            noteModalOpen ||
+            photoModalOpen ||
+            biometricModalOpen ||
+            settingsOpen ||
+            Boolean(photoPreview)
+          }
+        />
       </div>
 
     </div>

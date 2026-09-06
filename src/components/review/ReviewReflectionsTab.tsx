@@ -1,9 +1,10 @@
 // src/components/review/ReviewReflectionsTab.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Lock, Plus, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Reflection } from '../../types';
 import { getThemeColors } from '../../utils/themeStyles';
+import { DeleteConfirmationModal } from '../records/DeleteConfirmationModal';
 
 interface ReviewReflectionsTabProps {
   onOpenReflectionCreate: () => void;
@@ -18,8 +19,21 @@ export const ReviewReflectionsTab: React.FC<ReviewReflectionsTabProps> = ({
   onUnlockBiometric,
   onOpenTaskCreate,
 }) => {
-  const { reflections, deleteReflection, isBiometricLocked, theme } = useApp();
+  const {
+    reflections,
+    deleteReflection,
+    offloadItem,
+    permanentDeleteItem,
+    isBiometricLocked,
+    theme,
+  } = useApp();
   const themeColors = getThemeColors(theme);
+
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+  } | null>(null);
 
   return (
     <div className="space-y-3">
@@ -81,7 +95,13 @@ export const ReviewReflectionsTab: React.FC<ReviewReflectionsTabProps> = ({
                     编辑
                   </button>
                   <button
-                    onClick={() => deleteReflection(ref.id)}
+                    onClick={() =>
+                      setDeleteTarget({
+                        id: ref.id,
+                        title: '删除反思记录',
+                        description: `【心境：${ref.emotion}】${ref.eventDescription.slice(0, 50)}`,
+                      })
+                    }
                     className={`text-[11px] ${themeColors.textSub} hover:text-rose-500 ml-2`}
                   >
                     删除
@@ -161,6 +181,26 @@ export const ReviewReflectionsTab: React.FC<ReviewReflectionsTabProps> = ({
           ))}
         </div>
       )}
+
+      {/* Dual-Track Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.title || '删除反思记录'}
+        itemDescription={deleteTarget?.description}
+        onClose={() => setDeleteTarget(null)}
+        onOffload={() => {
+          if (deleteTarget) {
+            offloadItem('reflections', deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+        onPermanentDelete={() => {
+          if (deleteTarget) {
+            permanentDeleteItem('reflections', deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+      />
     </div>
   );
 };

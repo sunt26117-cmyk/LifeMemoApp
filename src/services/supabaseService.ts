@@ -316,7 +316,15 @@ class SupabaseService {
 
       // 6. Check-in Types
       if (payload.checkInTypes.length > 0) {
-        const rows = payload.checkInTypes.map((t) => ({
+        const seenLabels = new Set<string>();
+        const dedupedTypes = payload.checkInTypes.filter((t) => {
+          const key = (t.name || '').trim();
+          if (!key || seenLabels.has(key)) return false;
+          seenLabels.add(key);
+          return true;
+        });
+
+        const rows = dedupedTypes.map((t) => ({
           id: ensureUuid(t.id),
           symbol: t.symbol,
           label: t.name,
@@ -325,7 +333,7 @@ class SupabaseService {
           created_at: t.createdAt || new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }));
-        const { error } = await client.from('check_in_types').upsert(rows);
+        const { error } = await client.from('check_in_types').upsert(rows, { onConflict: 'id' });
         if (error) console.warn('[Supabase] check_in_types sync note:', error.message);
         else totalSynced += rows.length;
       }
@@ -591,20 +599,44 @@ class SupabaseService {
           }));
       }
 
-      // Pull check-in types
+      // Pull check-in types (deduplicate by label to prevent duplicate habits)
       const { data: cTypes } = await client
         .from('check_in_types')
         .select('*')
         .order('sort_order', { ascending: true });
       if (cTypes && cTypes.length > 0) {
-        results.checkInTypes = cTypes.map((t: any) => ({
-          id: t.id,
-          name: t.label || '',
-          symbol: t.symbol || '📖',
-          sortOrder: t.sort_order ?? 0,
-          enabled: t.enabled ?? true,
-          createdAt: t.created_at,
-        }));
+        const seenLabels = new Set<string>();
+        const uniqueTypes: any[] = [];
+        const duplicateIds: string[] = [];
+
+        for (const t of cTypes) {
+          const label = (t.label || '').trim();
+          if (!label) continue;
+          if (seenLabels.has(label)) {
+            duplicateIds.push(t.id);
+            continue;
+          }
+          seenLabels.add(label);
+          uniqueTypes.push({
+            id: t.id,
+            name: label,
+            symbol: t.symbol || '📖',
+            sortOrder: t.sort_order ?? 0,
+            enabled: t.enabled ?? true,
+            createdAt: t.created_at,
+          });
+        }
+        results.checkInTypes = uniqueTypes;
+
+        // Clean up cloud duplicate habit rows in background if any exist
+        if (duplicateIds.length > 0) {
+          try {
+            await client.from('check_in_types').delete().in('id', duplicateIds);
+            console.log(`[Supabase] Cleaned up ${duplicateIds.length} duplicate habit types in cloud`);
+          } catch (e) {
+            console.warn('[Supabase] Note on cleaning duplicate habit types:', e);
+          }
+        }
       }
 
       // Pull check-in records

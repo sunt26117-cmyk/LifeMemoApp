@@ -1,5 +1,5 @@
 // src/components/ReflectionEditModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Sparkles,
@@ -56,6 +56,43 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
   // Standalone Key Suggestion state
   const [keySuggestion, setKeySuggestion] = useState<string | null>(null);
   const [generatingKeySuggestion, setGeneratingKeySuggestion] = useState(false);
+
+  // Explicitly reset form fields whenever modal opens or reflection changes
+  useEffect(() => {
+    if (isOpen) {
+      if (reflection) {
+        setEventDescription(reflection.eventDescription || '');
+        setEmotion((reflection.emotion as Emotion) || '平静');
+        setActionTaken(reflection.actionTaken || '');
+        setResult(reflection.result || '');
+        setLessonsLearned(reflection.lessonsLearned || '');
+        setAiSummary(reflection.aiSummary || null);
+      } else {
+        setEventDescription('');
+        setEmotion('平静');
+        setActionTaken('');
+        setResult('');
+        setLessonsLearned('');
+        setAiSummary(null);
+      }
+      setKeySuggestion(null);
+      setGeneratingKeySuggestion(false);
+      setGenerating(false);
+      setValidationViolations([]);
+    }
+  }, [isOpen, reflection]);
+
+  const resetAndClose = () => {
+    setEventDescription('');
+    setEmotion('平静');
+    setActionTaken('');
+    setResult('');
+    setLessonsLearned('');
+    setAiSummary(null);
+    setKeySuggestion(null);
+    setValidationViolations([]);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -157,14 +194,14 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
         isUserConfirmed: true,
       });
     }
-    onClose();
+    resetAndClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl p-6 relative max-h-[90vh] overflow-y-auto">
         <button
-          onClick={onClose}
+          onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
         >
           <X className="w-4 h-4" />

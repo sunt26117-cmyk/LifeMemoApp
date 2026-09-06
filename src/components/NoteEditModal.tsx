@@ -1,5 +1,5 @@
 // src/components/NoteEditModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Pin } from 'lucide-react';
 import { Note } from '../types';
 import { useApp } from '../context/AppContext';
@@ -20,6 +20,28 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [isPinned, setIsPinned] = useState(note?.isPinned || false);
+
+  // Explicitly reset form fields whenever modal opens or note changes
+  useEffect(() => {
+    if (isOpen) {
+      if (note) {
+        setTitle(note.title || '');
+        setContent(note.content || '');
+        setIsPinned(note.isPinned || false);
+      } else {
+        setTitle('');
+        setContent('');
+        setIsPinned(false);
+      }
+    }
+  }, [isOpen, note]);
+
+  const resetAndClose = () => {
+    setTitle('');
+    setContent('');
+    setIsPinned(false);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -44,14 +66,14 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
         isPinned,
       });
     }
-    onClose();
+    resetAndClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative">
         <button
-          onClick={onClose}
+          onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
         >
           <X className="w-4 h-4" />

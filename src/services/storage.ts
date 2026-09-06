@@ -177,9 +177,37 @@ export class AppStorage {
     });
   }
   static deleteMemory(id: string): void {
+    const memory = this.getMemories().find((m) => m.id === id);
     const items = this.getMemories().filter((m) => m.id !== id);
     this.saveMemories(items);
     supabaseService.syncRecord('memories', 'delete', ensureUuid(id));
+
+    // Cascade delete any photos uploaded/associated with this memory
+    if (memory) {
+      const associatedMediaIds = new Set(memory.relatedMediaIds || []);
+      const directPhotos = new Set(memory.photos || []);
+      const allPhotos = this.getPhotos();
+      const photosToDelete: Photo[] = [];
+      const remainingPhotos = allPhotos.filter((p) => {
+        const isAssociated =
+          associatedMediaIds.has(p.id) ||
+          directPhotos.has(p.localPath) ||
+          directPhotos.has(p.id) ||
+          (p.relatedMemoryIds && p.relatedMemoryIds.includes(id));
+        if (isAssociated) {
+          photosToDelete.push(p);
+          return false;
+        }
+        return true;
+      });
+
+      if (photosToDelete.length > 0) {
+        this.savePhotos(remainingPhotos);
+        photosToDelete.forEach((p) => {
+          supabaseService.syncRecord('photos', 'delete', ensureUuid(p.id));
+        });
+      }
+    }
   }
 
   // Photos
@@ -342,10 +370,38 @@ export class AppStorage {
 
   // CheckInTypes
   static getCheckInTypes(): CheckInType[] {
-    return getLocal<CheckInType[]>(STORAGE_KEYS.CHECKIN_TYPES, initialCheckInTypes);
+    const raw = getLocal<CheckInType[]>(STORAGE_KEYS.CHECKIN_TYPES, initialCheckInTypes);
+    // Deduplicate by trimmed name to prevent duplicate habit entries
+    const seen = new Set<string>();
+    const deduplicated: CheckInType[] = [];
+    for (const item of raw) {
+      const key = (item.name || '').trim();
+      if (!key) continue;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push({
+          ...item,
+          id: ensureUuid(item.id),
+        });
+      }
+    }
+    return deduplicated;
   }
   static saveCheckInTypes(items: CheckInType[]): void {
-    setLocal(STORAGE_KEYS.CHECKIN_TYPES, items);
+    const seen = new Set<string>();
+    const deduplicated: CheckInType[] = [];
+    for (const item of items) {
+      const key = (item.name || '').trim();
+      if (!key) continue;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push({
+          ...item,
+          id: ensureUuid(item.id),
+        });
+      }
+    }
+    setLocal(STORAGE_KEYS.CHECKIN_TYPES, deduplicated);
   }
   static upsertCheckInType(item: CheckInType): void {
     const items = this.getCheckInTypes();
@@ -636,8 +692,23 @@ export class AppStorage {
     this.addOffloadedId(id);
     switch (collection) {
       case 'memories': {
+        const targetMem = this.getMemories().find((m) => m.id === id);
         const list = this.getMemories().filter((m) => m.id !== id);
         this.saveMemories(list);
+        if (targetMem) {
+          const associatedMediaIds = new Set(targetMem.relatedMediaIds || []);
+          const directPhotos = new Set(targetMem.photos || []);
+          this.getPhotos().forEach((p) => {
+            if (
+              associatedMediaIds.has(p.id) ||
+              directPhotos.has(p.localPath) ||
+              directPhotos.has(p.id) ||
+              (p.relatedMemoryIds && p.relatedMemoryIds.includes(id))
+            ) {
+              this.offloadItem('photos', p.id);
+            }
+          });
+        }
         break;
       }
       case 'photos': {
@@ -677,8 +748,23 @@ export class AppStorage {
     this.removeOffloadedId(id);
     switch (collection) {
       case 'memories': {
+        const targetMem = this.getMemories().find((m) => m.id === id);
         const list = this.getMemories().filter((m) => m.id !== id);
         this.saveMemories(list);
+        if (targetMem) {
+          const associatedMediaIds = new Set(targetMem.relatedMediaIds || []);
+          const directPhotos = new Set(targetMem.photos || []);
+          this.getPhotos().forEach((p) => {
+            if (
+              associatedMediaIds.has(p.id) ||
+              directPhotos.has(p.localPath) ||
+              directPhotos.has(p.id) ||
+              (p.relatedMemoryIds && p.relatedMemoryIds.includes(id))
+            ) {
+              this.permanentDeleteItem('photos', p.id);
+            }
+          });
+        }
         break;
       }
       case 'photos': {

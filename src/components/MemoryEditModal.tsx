@@ -1,5 +1,5 @@
 // src/components/MemoryEditModal.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Sparkles, Plus, MapPin, Camera, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Memory } from '../types';
 import { useApp } from '../context/AppContext';
@@ -35,6 +35,51 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  // Explicitly reset form fields whenever modal opens or memory changes
+  useEffect(() => {
+    if (isOpen) {
+      if (memory) {
+        setTitle(memory.title || '');
+        setContent(memory.content || '');
+        setTags(memory.tags ? [...memory.tags] : ['记录']);
+        setAiSummary(memory.aiSummary || '');
+        setSelectedPhotos(memory.relatedMediaIds ? [...memory.relatedMediaIds] : []);
+        setDirectPhotos(memory.photos ? [...memory.photos] : []);
+        setLocationName(memory.locationName || '');
+        setLatitude(memory.latitude || null);
+        setLongitude(memory.longitude || null);
+      } else {
+        setTitle('');
+        setContent('');
+        setTags(['记录']);
+        setAiSummary('');
+        setSelectedPhotos([]);
+        setDirectPhotos([]);
+        setLocationName('');
+        setLatitude(null);
+        setLongitude(null);
+      }
+      setNewTag('');
+      setLocationError(null);
+      setLocating(false);
+      setGenerating(false);
+    }
+  }, [isOpen, memory]);
+
+  const resetAndClose = () => {
+    setTitle('');
+    setContent('');
+    setTags(['记录']);
+    setAiSummary('');
+    setSelectedPhotos([]);
+    setDirectPhotos([]);
+    setLocationName('');
+    setLatitude(null);
+    setLongitude(null);
+    setNewTag('');
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -151,14 +196,14 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
     } else {
       addMemory(memoryPayload);
     }
-    onClose();
+    resetAndClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto">
         <button
-          onClick={onClose}
+          onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
         >
           <X className="w-4 h-4" />

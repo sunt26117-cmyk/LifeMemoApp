@@ -42,12 +42,54 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState('');
 
+  // Explicitly reset form fields whenever modal opens or task changes
+  useEffect(() => {
+    if (isOpen) {
+      if (task) {
+        setTitle(task.title || '');
+        setDescription(task.description || '');
+        setCategory(task.category || initialCategory || taskCategories[0] || '生活日常');
+        setPriority(task.priority || '中');
+        setDueTime(task.dueTime ? task.dueTime.slice(0, 16) : '');
+        setRepeatRule(task.repeatRule || '无');
+        setEstimatedMinutes(task.estimatedMinutes || 30);
+        setCheckInTypeId(task.checkInTypeId || '');
+        setSteps(task.steps ? [...task.steps] : []);
+      } else {
+        setTitle(initialTitle || '');
+        setDescription('');
+        setCategory(initialCategory || taskCategories[0] || '生活日常');
+        setPriority('中');
+        setDueTime('');
+        setRepeatRule('无');
+        setEstimatedMinutes(30);
+        setCheckInTypeId('');
+        setSteps([]);
+      }
+      setNewStepText('');
+      setDecomposing(false);
+      setIsAddingCategory(false);
+      setCustomCategoryInput('');
+    }
+  }, [isOpen, task, initialTitle, initialCategory, taskCategories]);
+
   // Synchronize category if list loaded
   useEffect(() => {
     if (!category && taskCategories.length > 0) {
       setCategory(taskCategories[0]);
     }
   }, [taskCategories, category]);
+
+  const resetAndClose = () => {
+    setTitle('');
+    setDescription('');
+    setDueTime('');
+    setSteps([]);
+    setNewStepText('');
+    setCustomCategoryInput('');
+    setIsAddingCategory(false);
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -120,14 +162,14 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         steps,
       });
     }
-    onClose();
+    resetAndClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto">
         <button
-          onClick={onClose}
+          onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
         >
           <X className="w-4 h-4" />

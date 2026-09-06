@@ -17,6 +17,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { Task, TaskCategory, TaskPriority, TaskStatus } from '../types';
 import { getThemeColors } from '../utils/themeStyles';
+import { DeleteConfirmationModal } from './records/DeleteConfirmationModal';
 
 interface TasksViewProps {
   onOpenTaskCreate: (category?: TaskCategory) => void;
@@ -38,12 +39,26 @@ export const TasksView: React.FC<TasksViewProps> = ({
   onOpenTaskEdit,
   onOpenTaskStatus,
 }) => {
-  const { tasks, deleteTask, changeTaskStatus, taskCategories, setSettingsOpen, theme } = useApp();
+  const {
+    tasks,
+    deleteTask,
+    offloadItem,
+    permanentDeleteItem,
+    changeTaskStatus,
+    taskCategories,
+    setSettingsOpen,
+    theme,
+  } = useApp();
   const themeColors = getThemeColors(theme);
 
   const [selectedCategory, setSelectedCategory] = useState<'全部' | TaskCategory>('全部');
   const [selectedStatus, setSelectedStatus] = useState<'全部' | TaskStatus>('全部');
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+  } | null>(null);
 
   const categoriesList = useMemo<('全部' | TaskCategory)[]>(() => {
     return ['全部', ...taskCategories];
@@ -323,8 +338,15 @@ export const TasksView: React.FC<TasksViewProps> = ({
                       <Edit2 className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={() => deleteTask(task.id)}
+                      onClick={() =>
+                        setDeleteTarget({
+                          id: task.id,
+                          title: '删除待办任务',
+                          description: `【${task.category} · 优先级:${task.priority}】${task.title}`,
+                        })
+                      }
                       className={`p-1 ${themeColors.textSub} hover:text-rose-500 rounded-md`}
+                      title="删除任务"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -335,6 +357,26 @@ export const TasksView: React.FC<TasksViewProps> = ({
           })
         )}
       </div>
+
+      {/* Dual-Track Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.title || '删除待办任务'}
+        itemDescription={deleteTarget?.description}
+        onClose={() => setDeleteTarget(null)}
+        onOffload={() => {
+          if (deleteTarget) {
+            offloadItem('tasks', deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+        onPermanentDelete={() => {
+          if (deleteTarget) {
+            permanentDeleteItem('tasks', deleteTarget.id);
+            setDeleteTarget(null);
+          }
+        }}
+      />
     </div>
   );
 };

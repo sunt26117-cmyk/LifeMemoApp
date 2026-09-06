@@ -4,7 +4,11 @@ import { MascotState, MascotExpression } from '../../domain/mascotState';
 import { getMascotTimeBucket, isMascotLateNight, MascotTimeBucket } from '../../domain/mascotTimeBucket';
 import { mascotRepository } from '../../data/repositories/mascotRepository';
 
-export function useMascotController() {
+interface UseMascotControllerOptions {
+  isBusy?: boolean;
+}
+
+export function useMascotController({ isBusy = false }: UseMascotControllerOptions = {}) {
   const [isEnabled, setIsEnabled] = useState<boolean>(() => mascotRepository.isEnabled());
   const [state, setState] = useState<MascotState>('hidden');
   const [expression, setExpression] = useState<MascotExpression>('normal');
@@ -18,6 +22,7 @@ export function useMascotController() {
   const bubbleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const bounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastInteractionTimeRef = useRef<number>(0);
 
   // 清除全部活跃定时器（用于切后台或状态重置）
   const clearAllTimers = useCallback(() => {
@@ -29,13 +34,60 @@ export function useMascotController() {
 
   const isSleeping = state === 'sleeping' || isMascotLateNight();
 
-  // 调度下一次随机待机小动作 (20~50s 随机)
+  // 检测用户是否正在积极操作 App、填写输入框、或处于详情查看弹窗中
+  const checkIsUserBusy = useCallback(() => {
+    if (isBusy) return true;
+    try {
+      const active = document.activeElement;
+      if (
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.tagName === 'SELECT' ||
+          (active as HTMLElement).isContentEditable)
+      ) {
+        return true;
+      }
+      // 检查 DOM 是否有正在显示的对话框或遮罩层
+      const modals = document.querySelectorAll(
+        '[role="dialog"], [aria-modal="true"], .fixed.inset-0:not(#mascot-global-overlay), .z-50'
+      );
+      if (modals && modals.length > 0) {
+        return true;
+      }
+    } catch {
+      // safe fallback
+    }
+
+    // 10 秒内有键入或表单交互则静默
+    if (Date.now() - lastInteractionTimeRef.current < 10000) {
+      return true;
+    }
+
+    return false;
+  }, [isBusy]);
+
+  // 当处于忙碌态（弹窗打开/用户编辑）时，立即清退任何气泡
+  useEffect(() => {
+    if (isBusy) {
+      setBubbleText(null);
+      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+    }
+  }, [isBusy]);
+
+  // 调度下一次随机待机小动作 (120~240s 间隔，温和克制，绝不频繁打扰)
   const scheduleNextIdleAction = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     if (isMascotLateNight()) return; // 深夜熟睡不触发跳跃小动作
 
-    const delay = 20000 + Math.random() * 30000; // 20~50 秒
+    const delay = 120000 + Math.random() * 120000; // 2 ~ 4 分钟温和待机
     idleTimerRef.current = setTimeout(() => {
+      // 若用户正在输入或查看内容，绝不弹气泡
+      if (checkIsUserBusy()) {
+        scheduleNextIdleAction();
+        return;
+      }
+
       setState((curr) => {
         if (curr !== 'topIdle') return curr;
 
@@ -44,14 +96,14 @@ export function useMascotController() {
         const randomExp = expressions[Math.floor(Math.random() * expressions.length)];
         setExpression(randomExp);
 
-        // 50% 几率吐出简短气泡
-        if (Math.random() > 0.5) {
+        // 仅 30% 几率吐出横向 3 行内的简短克制气泡，且必须不在忙碌态
+        if (Math.random() > 0.7 && !checkIsUserBusy()) {
           const line = mascotRepository.getRandomIdleLine();
           setBubbleText(line);
           setBubbleVariant('mini');
           bubbleTimerRef.current = setTimeout(() => {
             setBubbleText(null);
-          }, 2600);
+          }, 3000);
         }
 
         // 2.2 秒后恢复正常待机
@@ -65,7 +117,7 @@ export function useMascotController() {
       // 递归调度下一次
       scheduleNextIdleAction();
     }, delay);
-  }, []);
+  }, [checkIsUserBusy]);
 
   // 执行平滑入轨至顶栏 (Docking -> TopIdle)
   const dockToTop = useCallback((skipAnimation = false) => {
@@ -207,10 +259,53 @@ export function useMascotController() {
       }
     };
 
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        lastInteractionTimeRef.current = Date.now();
+        setBubbleText(null);
+        if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+      }
+    };
+
+    const handleKeyDown = () => {
+      lastInteractionTimeRef.current = Date.now();
+      setBubbleText((prev) => {
+        if (prev) {
+          if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+          return null;
+        }
+        return prev;
+      });
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      if (target?.closest('input, textarea, select, [role="dialog"], .z-50')) {
+        lastInteractionTimeRef.current = Date.now();
+        setBubbleText((prev) => {
+          if (prev) {
+            if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+            return null;
+          }
+          return prev;
+        });
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('mascot-trigger-greeting', handleTriggerGreeting);
     window.addEventListener('mascot-toggle', handleToggleEvent as EventListener);
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('pointerdown', handlePointerDown);
 
     return () => {
       clearAllTimers();
@@ -218,6 +313,9 @@ export function useMascotController() {
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('mascot-trigger-greeting', handleTriggerGreeting);
       window.removeEventListener('mascot-toggle', handleToggleEvent as EventListener);
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('pointerdown', handlePointerDown);
     };
   }, [initMascot, clearAllTimers, startFullGreetingFlow, scheduleNextIdleAction]);
 
