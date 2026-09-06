@@ -1,8 +1,0 @@
-{
-	"appId": "com.liferecorder.app",
-	"appName": "人生不设限",
-	"webDir": "dist",
-	"server": {
-		"androidScheme": "https"
-	}
-}
