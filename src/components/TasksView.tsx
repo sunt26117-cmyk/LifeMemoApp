@@ -61,7 +61,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   } | null>(null);
 
   const categoriesList = useMemo<('全部' | TaskCategory)[]>(() => {
-    return ['全部', ...taskCategories];
+    return ['全部', ...taskCategories.filter((c) => c !== '习惯' && c !== '习惯打卡')];
   }, [taskCategories]);
 
   useEffect(() => {

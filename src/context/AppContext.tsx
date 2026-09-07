@@ -20,6 +20,7 @@ import { AppStorage } from '../services/storage';
 import { ChangeTaskStatusParams, executeTaskStatusTransition } from '../services/taskService';
 import { supabaseService, SyncStatus } from '../services/supabaseService';
 import { newUuid } from '../utils/uuidUtil';
+import { habitNotificationService } from '../services/habitNotificationService';
 
 interface AppContextType {
   // Navigation
@@ -274,43 +275,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const pullFromSupabase = async () => {
     const res = await supabaseService.pullAll();
     if (res.success && res.data) {
-      if (res.data.memories) {
+      if (res.data.memories !== undefined) {
         AppStorage.saveMemories(res.data.memories);
         setMemories(res.data.memories);
       }
-      if (res.data.photos) {
+      if (res.data.photos !== undefined) {
         AppStorage.savePhotos(res.data.photos);
         setPhotos(res.data.photos);
       }
-      if (res.data.notes) {
+      if (res.data.notes !== undefined) {
         AppStorage.saveNotes(res.data.notes);
         setNotes(res.data.notes);
       }
-      if (res.data.tasks) {
+      if (res.data.tasks !== undefined) {
         AppStorage.saveTasks(res.data.tasks);
         setTasks(res.data.tasks);
       }
-      if (res.data.reflections) {
+      if (res.data.reflections !== undefined) {
         AppStorage.saveReflections(res.data.reflections);
         setReflections(res.data.reflections);
       }
-      if (res.data.checkInTypes) {
+      if (res.data.checkInTypes !== undefined) {
         AppStorage.saveCheckInTypes(res.data.checkInTypes);
         setCheckInTypes(res.data.checkInTypes);
       }
-      if (res.data.checkInRecords) {
+      if (res.data.checkInRecords !== undefined) {
         AppStorage.saveCheckInRecords(res.data.checkInRecords);
         setCheckInRecords(res.data.checkInRecords);
       }
-      if (res.data.trends) {
+      if (res.data.trends !== undefined) {
         AppStorage.saveTrends(res.data.trends);
         setTrends(res.data.trends);
       }
-      if (res.data.themes) {
+      if (res.data.themes !== undefined) {
         AppStorage.saveThemes(res.data.themes);
         setThemes(res.data.themes);
       }
-      if (res.data.summaries) {
+      if (res.data.summaries !== undefined) {
         AppStorage.saveSummaries(res.data.summaries);
         setSummaries(res.data.summaries);
       }
@@ -497,6 +498,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Trigger short encouragement toast when checked ON
     if (!isCurrentlyChecked) {
       showPraise(getCategoryPraise(type.name));
+      // 【核心功能】：如果完成了当前习惯打卡，系统通知栏提醒立即关闭消失；提前打卡则到点不提醒
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (date === todayStr) {
+        habitNotificationService.onHabitCompletedToday(type.id);
+      }
     }
   };
 

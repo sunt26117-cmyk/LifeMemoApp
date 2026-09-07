@@ -17,6 +17,7 @@ import { useApp } from '../context/AppContext';
 import { getLunarDisplay } from '../utils/lunarUtil';
 import { Task, TaskStatus } from '../types';
 import { getThemeColors } from '../utils/themeStyles';
+import { ManageHabitsModal } from './review/ManageHabitsModal';
 
 interface TodayViewProps {
   onOpenTaskCreate: (title?: string) => void;
@@ -49,6 +50,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
     setActiveTab,
     theme,
   } = useApp();
+
+  const [isManageHabitsOpen, setIsManageHabitsOpen] = useState(false);
 
   const themeColors = getThemeColors(theme);
 
@@ -173,13 +176,24 @@ export const TodayView: React.FC<TodayViewProps> = ({
             <span>今日习惯打卡</span>
             <span className={`text-[10px] ${themeColors.textSub} font-normal`}>（点击直接完成）</span>
           </span>
-          <button
-            onClick={() => setActiveTab('review')}
-            className={`text-[11px] ${themeColors.primaryText} hover:underline flex items-center font-medium`}
-          >
-            <span>日历全景</span>
-            <ArrowRight className="w-3 h-3 ml-0.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsManageHabitsOpen(true)}
+              className={`text-[11px] ${themeColors.primaryText} hover:underline flex items-center gap-1 font-medium`}
+              title="设置习惯固定时间段、手机通知栏提醒与防打扰规则"
+            >
+              <Clock className="w-3 h-3" />
+              <span>时段与提醒</span>
+            </button>
+            <span className="text-slate-300">|</span>
+            <button
+              onClick={() => setActiveTab('review')}
+              className={`text-[11px] ${themeColors.primaryText} hover:underline flex items-center font-medium`}
+            >
+              <span>日历全景</span>
+              <ArrowRight className="w-3 h-3 ml-0.5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -187,6 +201,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
             .filter((t) => t.enabled)
             .map((type) => {
               const isChecked = todayCheckIns.some((r) => r.typeId === type.id);
+              const hasReminder = type.reminder?.enabled;
+              const timeDisplay = type.reminder?.targetStartTime || type.reminder?.reminderTime;
               return (
                 <button
                   key={type.id}
@@ -196,9 +212,15 @@ export const TodayView: React.FC<TodayViewProps> = ({
                       ? 'bg-emerald-100/70 border-emerald-300 text-emerald-800 shadow-xs scale-98'
                       : `${themeColors.subtleBg} ${themeColors.subtleBorder} ${themeColors.textMain} ${themeColors.subtleHoverBg}`
                   }`}
+                  title={hasReminder ? `计划时段: ${timeDisplay}，已开启智能通知` : undefined}
                 >
                   <span className="text-sm">{type.symbol}</span>
                   <span>{type.name}</span>
+                  {hasReminder && (
+                    <span className="text-[10px] text-slate-400 font-mono font-normal">
+                      {timeDisplay}
+                    </span>
+                  )}
                   {isChecked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 ml-0.5" />}
                 </button>
               );
@@ -434,6 +456,13 @@ export const TodayView: React.FC<TodayViewProps> = ({
           </div>
         ))}
       </div>
+
+      {isManageHabitsOpen && (
+        <ManageHabitsModal
+          isOpen={isManageHabitsOpen}
+          onClose={() => setIsManageHabitsOpen(false)}
+        />
+      )}
     </div>
   );
 };

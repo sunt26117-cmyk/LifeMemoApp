@@ -32,6 +32,12 @@ const STORAGE_KEY_SUPABASE_KEY = 'ai_recorder_supabase_key';
 const STORAGE_KEY_SUPABASE_AUTOSYNC = 'ai_recorder_supabase_autosync';
 const STORAGE_KEY_LAST_SYNC = 'ai_recorder_supabase_last_sync';
 
+interface DeletedRecord {
+  id: string;
+  collection: string;
+  deletedAt?: string;
+}
+
 function getOffloadedIdSet(): Set<string> {
   try {
     const raw = localStorage.getItem('ai_recorder_offloaded_ids');
@@ -40,6 +46,36 @@ function getOffloadedIdSet(): Set<string> {
   } catch {
     return new Set();
   }
+}
+
+function getDeletedRecordsInfo(): { idSet: Set<string>; byCollection: Record<string, string[]> } {
+  try {
+    const raw = localStorage.getItem('ai_recorder_deleted_records');
+    if (!raw) return { idSet: new Set(), byCollection: {} };
+    const list: { id: string; collection: string }[] = JSON.parse(raw);
+    const idSet = new Set<string>();
+    const byCollection: Record<string, string[]> = {};
+    list.forEach((item) => {
+      idSet.add(item.id);
+      if (!byCollection[item.collection]) byCollection[item.collection] = [];
+      byCollection[item.collection].push(item.id);
+    });
+    return { idSet, byCollection };
+  } catch {
+    return { idSet: new Set(), byCollection: {} };
+  }
+}
+
+function cleanExpiredDeletedRecordsStorage(): void {
+  try {
+    const raw = localStorage.getItem('ai_recorder_deleted_records');
+    if (!raw) return;
+    const list: DeletedRecord[] = JSON.parse(raw);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    // Keep 30 days of deletion tombstones to strictly block any cloud resurrection
+    const retained = list.filter((item) => !item.deletedAt || item.deletedAt > thirtyDaysAgo);
+    localStorage.setItem('ai_recorder_deleted_records', JSON.stringify(retained));
+  } catch {}
 }
 
 class SupabaseService {
@@ -213,6 +249,60 @@ class SupabaseService {
     let totalSynced = 0;
 
     try {
+      const { byCollection: deletedByCollection } = getDeletedRecordsInfo();
+      const offloadedSet = getOffloadedIdSet();
+
+      // Step 0: Explicitly delete from Supabase all recorded deleted items
+      for (const [col, ids] of Object.entries(deletedByCollection)) {
+        if (ids && ids.length > 0) {
+          try {
+            await client.from(col).delete().in('id', ids.map(ensureUuid));
+          } catch (e) {
+            console.warn(`[Supabase Upload] Delete tombstones error in ${col}:`, e);
+          }
+        }
+      }
+
+      // Step 0.5: Mirror cleanup - if user deleted items locally,
+      // compare cloud items with local active items. Any cloud item not in local active items and not offloaded must be deleted!
+      const mirrorDeleteOrphans = async (tableName: string, activeIds: string[]) => {
+        try {
+          const { data: cloudList, error: listErr } = await client.from(tableName).select('id');
+          if (listErr) {
+            console.warn(`[Supabase Mirror Cleanup] Could not list ${tableName}:`, listErr);
+            return;
+          }
+          if (cloudList && cloudList.length > 0) {
+            const activeSet = new Set(activeIds.map(ensureUuid));
+            const orphanIds = cloudList
+              .map((r: any) => r.id)
+              .filter((cid: string) => !activeSet.has(cid) && !offloadedSet.has(cid));
+            if (orphanIds.length > 0) {
+              for (let i = 0; i < orphanIds.length; i += 50) {
+                const batch = orphanIds.slice(i, i + 50);
+                const { error: delErr } = await client.from(tableName).delete().in('id', batch);
+                if (delErr) {
+                  console.warn(`[Supabase Mirror Cleanup] Delete batch error on ${tableName}:`, delErr);
+                  await client.from(tableName).update({ is_deleted: true }).in('id', batch);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`[Supabase Mirror Cleanup] Warning on ${tableName}:`, err);
+        }
+      };
+
+      await mirrorDeleteOrphans('memories', payload.memories.map((m) => m.id));
+      await mirrorDeleteOrphans('photos', payload.photos.map((p) => p.id));
+      await mirrorDeleteOrphans('notes', payload.notes.map((n) => n.id));
+      await mirrorDeleteOrphans('tasks', payload.tasks.map((t) => t.id));
+      await mirrorDeleteOrphans('reflections', payload.reflections.map((r) => r.id));
+      await mirrorDeleteOrphans('summaries', payload.summaries.map((s) => s.id));
+
+      // Clean only expired tombstones (> 30 days), retaining recent ones to prevent resurrection
+      cleanExpiredDeletedRecordsStorage();
+
       // 1. Memories
       if (payload.memories.length > 0) {
         const rows = payload.memories.map((m) => ({
@@ -462,17 +552,29 @@ class SupabaseService {
     this.notify();
 
     try {
-      const results: any = {};
+      const results: any = {
+        memories: [],
+        photos: [],
+        notes: [],
+        tasks: [],
+        reflections: [],
+        summaries: [],
+        checkInTypes: [],
+        checkInRecords: [],
+        trends: [],
+        themes: [],
+      };
       const offloadedSet = getOffloadedIdSet();
+      const { idSet: deletedIdSet } = getDeletedRecordsInfo();
 
-      // Pull memories (Ghost prevention: exclude is_deleted and offloaded)
+      // Pull memories (Ghost prevention: exclude is_deleted, offloaded, and deletedIdSet)
       const { data: mems } = await client
         .from('memories')
         .select('*')
         .order('created_at', { ascending: false });
       if (mems && mems.length > 0) {
         results.memories = mems
-          .filter((m: any) => !m.is_deleted && !offloadedSet.has(m.id))
+          .filter((m: any) => !m.is_deleted && !offloadedSet.has(m.id) && !deletedIdSet.has(m.id))
           .map((m: any) => ({
             id: m.id,
             title: m.title || null,
@@ -497,7 +599,7 @@ class SupabaseService {
         .order('taken_at', { ascending: false });
       if (pts && pts.length > 0) {
         results.photos = pts
-          .filter((p: any) => !p.is_deleted && !offloadedSet.has(p.id))
+          .filter((p: any) => !p.is_deleted && !offloadedSet.has(p.id) && !deletedIdSet.has(p.id))
           .map((p: any) => ({
             id: p.id,
             localPath: p.local_path,
@@ -523,7 +625,7 @@ class SupabaseService {
         .order('created_at', { ascending: false });
       if (nts && nts.length > 0) {
         results.notes = nts
-          .filter((n: any) => !n.is_deleted && !offloadedSet.has(n.id))
+          .filter((n: any) => !n.is_deleted && !offloadedSet.has(n.id) && !deletedIdSet.has(n.id))
           .map((n: any) => {
             let tags: string[] = [];
             try {
@@ -550,7 +652,7 @@ class SupabaseService {
         .order('created_at', { ascending: false });
       if (tsks && tsks.length > 0) {
         results.tasks = tsks
-          .filter((t: any) => !t.is_deleted && !offloadedSet.has(t.id))
+          .filter((t: any) => !t.is_deleted && !offloadedSet.has(t.id) && !deletedIdSet.has(t.id))
           .map((t: any) => ({
             id: t.id,
             title: t.title,
@@ -580,7 +682,7 @@ class SupabaseService {
         .order('created_at', { ascending: false });
       if (refs && refs.length > 0) {
         results.reflections = refs
-          .filter((r: any) => !r.is_deleted && !offloadedSet.has(r.id))
+          .filter((r: any) => !r.is_deleted && !offloadedSet.has(r.id) && !deletedIdSet.has(r.id))
           .map((r: any) => ({
             id: r.id,
             eventDescription: r.event_description,
@@ -699,7 +801,7 @@ class SupabaseService {
         .order('created_at', { ascending: false });
       if (sums && sums.length > 0) {
         results.summaries = sums
-          .filter((s: any) => !s.is_deleted && !offloadedSet.has(s.id))
+          .filter((s: any) => !s.is_deleted && !offloadedSet.has(s.id) && !deletedIdSet.has(s.id))
           .map((s: any) => ({
             id: s.id,
             type: s.type,

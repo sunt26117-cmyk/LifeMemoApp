@@ -4,6 +4,7 @@ import { X, Sparkles, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { RepeatRule, Task, TaskCategory, TaskPriority, TaskStep } from '../types';
 import { useApp } from '../context/AppContext';
 import { AiService } from '../services/aiService';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface TaskEditModalProps {
   isOpen: boolean;
@@ -13,7 +14,8 @@ interface TaskEditModalProps {
   onClose: () => void;
 }
 
-const CATEGORIES: TaskCategory[] = ['沟通', '学习', '健康', '项目', '情绪', '习惯', '规划'];
+// 遵循用户需求：任务新建中彻底去掉和习惯关联的选项
+const CATEGORIES: TaskCategory[] = ['沟通', '学习', '健康', '项目', '情绪', '规划'];
 const PRIORITIES: TaskPriority[] = ['高', '中', '低'];
 const REPEAT_RULES: RepeatRule[] = ['无', '每天', '每周', '每月', '自定义'];
 
@@ -24,7 +26,8 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   initialCategory,
   onClose,
 }) => {
-  const { addTask, updateTask, checkInTypes, taskCategories, addTaskCategory } = useApp();
+  const { addTask, updateTask, taskCategories, addTaskCategory, theme } = useApp();
+  const themeColors = getThemeColors(theme);
 
   const [title, setTitle] = useState(task?.title || initialTitle);
   const [description, setDescription] = useState(task?.description || '');
@@ -35,7 +38,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   const [dueTime, setDueTime] = useState(task?.dueTime ? task.dueTime.slice(0, 16) : '');
   const [repeatRule, setRepeatRule] = useState<RepeatRule>(task?.repeatRule || '无');
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(task?.estimatedMinutes || 30);
-  const [checkInTypeId, setCheckInTypeId] = useState<string>(task?.checkInTypeId || '');
   const [steps, setSteps] = useState<TaskStep[]>(task?.steps || []);
   const [newStepText, setNewStepText] = useState('');
   const [decomposing, setDecomposing] = useState(false);
@@ -53,7 +55,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         setDueTime(task.dueTime ? task.dueTime.slice(0, 16) : '');
         setRepeatRule(task.repeatRule || '无');
         setEstimatedMinutes(task.estimatedMinutes || 30);
-        setCheckInTypeId(task.checkInTypeId || '');
         setSteps(task.steps ? [...task.steps] : []);
       } else {
         setTitle(initialTitle || '');
@@ -63,7 +64,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         setDueTime('');
         setRepeatRule('无');
         setEstimatedMinutes(30);
-        setCheckInTypeId('');
         setSteps([]);
       }
       setNewStepText('');
@@ -145,7 +145,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         dueTime: dueTime ? new Date(dueTime).toISOString() : null,
         repeatRule,
         estimatedMinutes,
-        checkInTypeId: checkInTypeId || null,
         steps,
       });
     } else {
@@ -158,7 +157,6 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         dueTime: dueTime ? new Date(dueTime).toISOString() : null,
         repeatRule,
         estimatedMinutes,
-        checkInTypeId: checkInTypeId || null,
         steps,
       });
     }
@@ -257,13 +255,15 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as TaskCategory)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500"
                 >
-                  {Array.from(new Set([...taskCategories, category].filter(Boolean))).map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  {Array.from(new Set([...taskCategories, category].filter(Boolean)))
+                    .filter((c) => c !== '习惯' && c !== '习惯打卡')
+                    .map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                 </select>
               )}
             </div>
@@ -311,34 +311,18 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">预估用时</label>
-              <input
-                type="number"
-                min={5}
-                step={5}
-                value={estimatedMinutes}
-                onChange={(e) => setEstimatedMinutes(parseInt(e.target.value) || 30)}
-                className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">关联打卡习惯</label>
-              <select
-                value={checkInTypeId}
-                onChange={(e) => setCheckInTypeId(e.target.value)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
-              >
-                <option value="">不关联</option>
-                {checkInTypes.filter((c) => c.enabled).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.symbol} {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              预估用时（分钟）
+            </label>
+            <input
+              type="number"
+              min={5}
+              step={5}
+              value={estimatedMinutes}
+              onChange={(e) => setEstimatedMinutes(parseInt(e.target.value) || 30)}
+              className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+            />
           </div>
 
           {/* Sub-steps & AI Breakdown */}
@@ -417,7 +401,10 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#57B8E3] hover:bg-[#46a5d0] text-white text-xs font-medium rounded-xl transition-colors shadow-xs"
+              className={`px-4 py-2 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl transition-colors shadow-xs`}
+              style={{
+                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
+              }}
             >
               {task ? '保存修改' : '创建任务'}
             </button>

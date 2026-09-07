@@ -3,6 +3,7 @@ import {
   AppTheme,
   CheckInRecord,
   CheckInType,
+  DeletedRecord,
   Memory,
   Note,
   Photo,
@@ -69,6 +70,7 @@ const STORAGE_KEYS = {
   LAST_RECONCILE_TIME: 'last_reconcile_time',
   TASK_CATEGORIES: 'ai_recorder_task_categories',
   APP_THEME: 'ai_recorder_app_theme',
+  DELETED_RECORDS: 'ai_recorder_deleted_records',
   CLEANUP_V2: 'ai_recorder_cleaned_v2',
   CLEANUP_TEMPLATE_PURGE: 'ai_recorder_cleaned_template_purge_v3',
 };
@@ -85,7 +87,7 @@ export const DEFAULT_TASK_CATEGORIES: string[] = [
   '情绪觉察',
   '休闲放松',
   '人际沟通',
-  '习惯打卡',
+  '项目工作',
   '个人财务',
 ];
 
@@ -180,6 +182,7 @@ export class AppStorage {
     const memory = this.getMemories().find((m) => m.id === id);
     const items = this.getMemories().filter((m) => m.id !== id);
     this.saveMemories(items);
+    this.recordDeletedRecord('memories', id);
     supabaseService.syncRecord('memories', 'delete', ensureUuid(id));
 
     // Cascade delete any photos uploaded/associated with this memory
@@ -204,6 +207,7 @@ export class AppStorage {
       if (photosToDelete.length > 0) {
         this.savePhotos(remainingPhotos);
         photosToDelete.forEach((p) => {
+          this.recordDeletedRecord('photos', p.id);
           supabaseService.syncRecord('photos', 'delete', ensureUuid(p.id));
         });
       }
@@ -249,6 +253,7 @@ export class AppStorage {
   static deletePhoto(id: string): void {
     const items = this.getPhotos().filter((p) => p.id !== id);
     this.savePhotos(items);
+    this.recordDeletedRecord('photos', id);
     supabaseService.syncRecord('photos', 'delete', ensureUuid(id));
   }
 
@@ -283,6 +288,7 @@ export class AppStorage {
   static deleteNote(id: string): void {
     const items = this.getNotes().filter((n) => n.id !== id);
     this.saveNotes(items);
+    this.recordDeletedRecord('notes', id);
     supabaseService.syncRecord('notes', 'delete', ensureUuid(id));
   }
 
@@ -326,6 +332,7 @@ export class AppStorage {
   static deleteTask(id: string): void {
     const items = this.getTasks().filter((t) => t.id !== id);
     this.saveTasks(items);
+    this.recordDeletedRecord('tasks', id);
     supabaseService.syncRecord('tasks', 'delete', ensureUuid(id));
   }
 
@@ -365,6 +372,7 @@ export class AppStorage {
   static deleteReflection(id: string): void {
     const items = this.getReflections().filter((r) => r.id !== id);
     this.saveReflections(items);
+    this.recordDeletedRecord('reflections', id);
     supabaseService.syncRecord('reflections', 'delete', ensureUuid(id));
   }
 
@@ -608,7 +616,12 @@ export class AppStorage {
 
   // Dynamic Task Categories
   static getTaskCategories(): string[] {
-    return getLocal<string[]>(STORAGE_KEYS.TASK_CATEGORIES, DEFAULT_TASK_CATEGORIES);
+    const raw = getLocal<string[]>(STORAGE_KEYS.TASK_CATEGORIES, DEFAULT_TASK_CATEGORIES);
+    const filtered = raw.filter((c) => c !== '习惯' && c !== '习惯打卡');
+    if (filtered.length !== raw.length) {
+      this.saveTaskCategories(filtered);
+    }
+    return filtered.length > 0 ? filtered : DEFAULT_TASK_CATEGORIES;
   }
 
   static saveTaskCategories(categories: string[]): void {
@@ -685,6 +698,48 @@ export class AppStorage {
 
   static setLastReconcileTime(time: number): void {
     localStorage.setItem(STORAGE_KEYS.LAST_RECONCILE_TIME, String(time));
+  }
+
+  // Deleted Records Tracking (防止云端拉取时误复活已删除数据)
+  static getDeletedRecords(): DeletedRecord[] {
+    return getLocal<DeletedRecord[]>(STORAGE_KEYS.DELETED_RECORDS, []);
+  }
+
+  static getDeletedIdSet(): Set<string> {
+    const list = this.getDeletedRecords();
+    return new Set(list.map((r) => r.id));
+  }
+
+  static recordDeletedRecord(
+    collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries' | 'check_in_records',
+    id: string
+  ): void {
+    const safeId = ensureUuid(id);
+    const list = this.getDeletedRecords();
+    if (!list.some((r) => r.id === safeId)) {
+      list.push({
+        id: safeId,
+        collection,
+        deletedAt: new Date().toISOString(),
+      });
+      setLocal(STORAGE_KEYS.DELETED_RECORDS, list);
+    }
+  }
+
+  static removeDeletedRecord(id: string): void {
+    const safeId = ensureUuid(id);
+    const list = this.getDeletedRecords().filter((r) => r.id !== safeId);
+    setLocal(STORAGE_KEYS.DELETED_RECORDS, list);
+  }
+
+  static removeDeletedRecords(ids: string[]): void {
+    const idSet = new Set(ids.map(ensureUuid));
+    const list = this.getDeletedRecords().filter((r) => !idSet.has(r.id));
+    setLocal(STORAGE_KEYS.DELETED_RECORDS, list);
+  }
+
+  static clearDeletedRecords(): void {
+    setLocal(STORAGE_KEYS.DELETED_RECORDS, []);
   }
 
   // Dual-Track Operations: Offload vs Permanent Delete
@@ -793,10 +848,9 @@ export class AppStorage {
         break;
       }
     }
-    // 向云端同步软删除标记
-    supabaseService.syncRecord(collection, 'upsert', id, {
-      is_deleted: true,
-    });
+    // 记录到已删除集合并彻底从云端数据库物理删除，杜绝再次拉取时死灰复燃
+    this.recordDeletedRecord(collection, id);
+    supabaseService.syncRecord(collection, 'delete', ensureUuid(id));
   }
 
   static restoreItem(collection: 'memories' | 'photos' | 'notes' | 'tasks' | 'reflections' | 'summaries', item: any): void {

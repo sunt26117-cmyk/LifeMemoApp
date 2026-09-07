@@ -136,22 +136,29 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
         {/* Action Button */}
         <div className="flex gap-1.5">
-          {activeSubTab === 'notes' && (
+          {activeSubTab === 'notes' ? (
             <button
               onClick={onOpenNoteCreate}
-              className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-xs transition-colors"
+              className={`flex items-center gap-1.5 px-3 py-1.5 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl shadow-xs transition-all`}
+              style={{
+                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
+              }}
               title="新建便签"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5 text-white" />
+              <span>新建便签</span>
             </button>
-          )}
-          {(activeSubTab === 'all' || activeSubTab === 'memories') && (
+          ) : (
             <button
               onClick={onOpenMemoryCreate}
-              className={`p-2 ${themeColors.actionBtn} text-white rounded-xl shadow-xs transition-colors`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl shadow-xs transition-all`}
+              style={{
+                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
+              }}
               title="写记录"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5 text-white" />
+              <span>写记录</span>
             </button>
           )}
         </div>
@@ -208,6 +215,12 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
       {/* Content Stream */}
       <div className="space-y-3">
+        {activeSubTab === 'notes' && filteredNotes.length === 0 && (
+          <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center text-xs ${themeColors.textSub}`}>
+            暂无便签备忘，点击右上角「新建便签」快速记下灵感
+          </div>
+        )}
+
         {(activeSubTab === 'all' || activeSubTab === 'notes') && filteredNotes.length > 0 && (
           <div className="space-y-2">
             {activeSubTab === 'all' && (

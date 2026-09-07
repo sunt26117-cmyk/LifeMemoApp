@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Pin } from 'lucide-react';
 import { Note } from '../types';
 import { useApp } from '../context/AppContext';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface NoteEditModalProps {
   isOpen: boolean;
@@ -15,7 +16,8 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
   note,
   onClose,
 }) => {
-  const { addNote, updateNote } = useApp();
+  const { addNote, updateNote, theme } = useApp();
+  const themeColors = getThemeColors(theme);
 
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
@@ -135,7 +137,10 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#57B8E3] hover:bg-[#46a5d0] text-white text-xs font-medium rounded-xl transition-colors shadow-xs"
+              className={`px-4 py-2 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl transition-colors shadow-xs`}
+              style={{
+                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
+              }}
             >
               保存便签
             </button>
