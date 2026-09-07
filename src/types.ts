@@ -87,6 +87,15 @@ export interface Note {
   updatedAt: string;
 }
 
+export interface HabitReminderConfig {
+  enabled: boolean;
+  daysOfWeek: number[];
+  targetStartTime?: string;
+  targetEndTime?: string;
+  reminderTime: string;
+  advanceMinutes?: number;
+}
+
 export interface CheckInType {
   id: string;
   name: string; // max 3 Chinese characters, e.g. 学习, 运动, 散步, 早起
@@ -94,7 +103,14 @@ export interface CheckInType {
   colorHex?: string;
   sortOrder: number;
   enabled: boolean;
+  reminder?: HabitReminderConfig;
   createdAt: string;
+}
+
+export interface DeletedRecord {
+  id: string;
+  collection: string;
+  deletedAt?: string;
 }
 
 export interface CheckInRecord {

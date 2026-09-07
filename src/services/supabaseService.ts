@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   CheckInRecord,
   CheckInType,
+  DeletedRecord,
   Memory,
   Note,
   Photo,
@@ -31,12 +32,6 @@ const STORAGE_KEY_SUPABASE_URL = 'ai_recorder_supabase_url';
 const STORAGE_KEY_SUPABASE_KEY = 'ai_recorder_supabase_key';
 const STORAGE_KEY_SUPABASE_AUTOSYNC = 'ai_recorder_supabase_autosync';
 const STORAGE_KEY_LAST_SYNC = 'ai_recorder_supabase_last_sync';
-
-interface DeletedRecord {
-  id: string;
-  collection: string;
-  deletedAt?: string;
-}
 
 function getOffloadedIdSet(): Set<string> {
   try {
