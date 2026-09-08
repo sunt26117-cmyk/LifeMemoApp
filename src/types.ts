@@ -107,6 +107,8 @@ export interface CheckInType {
   createdAt: string;
 }
 
+export type CheckInTask = CheckInType;
+
 export interface DeletedRecord {
   id: string;
   collection: string;

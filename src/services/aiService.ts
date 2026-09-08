@@ -1,5 +1,5 @@
 // src/services/aiService.ts
-import { ContextPack, ReflectionSummary, SummaryType, TimeUnit } from '../types';
+import { ContextPack, ReflectionSummary, SummaryType, TimeUnit, CheckInRecord, CheckInType } from '../types';
 import { validate } from '../utils/validator';
 import { AppStorage } from './storage';
 import { distributeDuration } from '../utils/taskTimeUtil';
@@ -357,6 +357,7 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
 
   /**
    * 周期总结生成 (周 / 月 / 年)
+   * 深度融合：读取并分析每天打卡的习惯名称与对应的时间点
    */
   static async generatePeriodicSummary(params: {
     type: SummaryType;
@@ -366,6 +367,8 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
     tasksTotal: number;
     checkInCount: number;
     reflectionCount: number;
+    checkInRecords?: CheckInRecord[];
+    checkInTypes?: CheckInType[];
   }): Promise<{
     content: string;
     themes: { name: string; direction: '改善' | '稳定' | '恶化'; weight: number }[];
@@ -374,22 +377,165 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
   }> {
     const rate = params.tasksTotal > 0 ? Math.round((params.tasksCompleted / params.tasksTotal) * 100) : 80;
 
+    // 获取实际打卡记录与习惯字典
+    const records = params.checkInRecords || AppStorage.getCheckInRecords();
+    const types = params.checkInTypes || AppStorage.getCheckInTypes();
+    const typeMap = new Map<string, string>();
+    for (const t of types) {
+      typeMap.set(t.id, t.name);
+    }
+
+    // 过滤与排序当前周期或近期的打卡记录
+    const startDateStr = params.periodStart.slice(0, 10);
+    const endDateStr = params.periodEnd.slice(0, 10);
+    const periodRecords = records
+      .filter((r) => r.date >= startDateStr && r.date <= endDateStr)
+      .sort((a, b) => (a.date === b.date ? (a.checkInTime || '').localeCompare(b.checkInTime || '') : a.date.localeCompare(b.date)));
+
+    // 聚合每日打卡习惯及时间点列表
+    const dayHabitMap = new Map<string, { name: string; time: string }[]>();
+    for (const r of periodRecords) {
+      const habitName = typeMap.get(r.typeId) || '日常习惯';
+      const timeStr = r.checkInTime || (r.createdAt ? r.createdAt.slice(11, 16) : '未知时间');
+      const list = dayHabitMap.get(r.date) || [];
+      list.push({ name: habitName, time: timeStr });
+      dayHabitMap.set(r.date, list);
+    }
+
+    // 生成时间流水文本给 AI 阅读
+    const dayHabitsLines: string[] = [];
+    dayHabitMap.forEach((habits, date) => {
+      const items = habits.map((h) => `${h.name}（${h.time}）`).join('、');
+      dayHabitsLines.push(`- ${date}: ${items}`);
+    });
+    const habitStreamContext =
+      dayHabitsLines.length > 0
+        ? `【周期每日习惯打卡与具体时间点流水（共 ${periodRecords.length} 次）】:\n${dayHabitsLines.slice(-14).join('\n')}`
+        : '【习惯打卡】：暂无特定打卡流水记录';
+
+    // 尝试调用 DeepSeek API 进行真实 AI 深度总结
+    const apiKey = AppStorage.getApiKey();
+    if (apiKey) {
+      try {
+        const response = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'deepseek-chat',
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'system',
+                content: `你是一个客观专业的个人行为与生活复盘 AI 助手。请综合分析用户的待办任务执行情况、反思记录，以及【每日打卡的习惯及对应的时间点】，撰写一份周期${params.type}度总结。
+要求：
+1. 必须认真审阅用户每天打卡的具体习惯和对应的时间点流水（如晨间早起、白天专注、晚间就寝/复盘的时间分布与波动），提炼出作息规律与执行时效特征，并融入总结总述与亮点。
+2. 严格遵守尾部约束：不推断未写内容 / 不评价人格 / 不生成心理咨询内容。
+3. 每条 taskSuggestions 必须以白名单动词开头且字数 ≥ 4 字：制定/列出/写/记录/确认/设置/添加/使用/建立/执行/保存/检查/创建/安排/发送/准备/复习/更新/关闭/开启。
+输出标准 JSON 格式：
+{
+  "content": "总结总述，包含对习惯打卡时间点（如几点打卡、早晚节律）的具体洞察与任务达成概览...",
+  "themes": [
+    { "name": "习惯", "direction": "改善", "weight": 8 },
+    { "name": "健康", "direction": "稳定", "weight": 6 }
+  ],
+  "highlights": [
+    "提炼包含习惯打卡时间规律的亮点1",
+    "亮点2",
+    "亮点3"
+  ],
+  "taskSuggestions": [
+    "保持每日固定时间打卡习惯",
+    "制定下一阶段目标执行清单"
+  ]
+}`,
+              },
+              {
+                role: 'user',
+                content: `周期类型：${params.type}度总结
+时间区间：${startDateStr} 至 ${endDateStr}
+待办任务：总数 ${params.tasksTotal} 项，完成 ${params.tasksCompleted} 项（达成率约 ${rate}%）
+反思沉淀：${params.reflectionCount} 篇
+${habitStreamContext}`,
+              },
+            ],
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+          if (parsed.content && Array.isArray(parsed.highlights) && Array.isArray(parsed.taskSuggestions)) {
+            return {
+              content: parsed.content,
+              themes: Array.isArray(parsed.themes) && parsed.themes.length > 0 ? parsed.themes : [
+                { name: '习惯', direction: '改善', weight: 8 },
+                { name: '项目', direction: '改善', weight: 6 },
+                { name: '健康', direction: rate >= 75 ? '改善' : '稳定', weight: 4 },
+              ],
+              highlights: parsed.highlights,
+              taskSuggestions: parsed.taskSuggestions,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('DeepSeek periodic summary failed, falling back to local synthesis:', err);
+      }
+    }
+
+    // 本地高质量启发式融合总结（深度包含打卡习惯与具体时间点分析）
+    let habitInsightText = '';
+    const sampleHabitHighlights: string[] = [];
+
+    if (dayHabitMap.size > 0) {
+      // 提取前几个习惯的时间点样本
+      const habitTimes: { [name: string]: string[] } = {};
+      periodRecords.forEach((r) => {
+        const name = typeMap.get(r.typeId) || '日常习惯';
+        const t = r.checkInTime || (r.createdAt ? r.createdAt.slice(11, 16) : '');
+        if (t) {
+          if (!habitTimes[name]) habitTimes[name] = [];
+          habitTimes[name].push(t);
+        }
+      });
+
+      const habitSummaries: string[] = [];
+      Object.entries(habitTimes).forEach(([name, times]) => {
+        const sorted = [...times].sort();
+        const earliest = sorted[0];
+        const latest = sorted[sorted.length - 1];
+        if (sorted.length === 1) {
+          habitSummaries.push(`【${name}】打卡时间为 ${earliest}`);
+        } else {
+          habitSummaries.push(`【${name}】打卡时段分布在 ${earliest} ~ ${latest}（共记录 ${sorted.length} 次）`);
+        }
+      });
+
+      habitInsightText = `在日常习惯追踪上，AI 深入读取了这几天的打卡时间点流水：${habitSummaries.slice(0, 3).join('；')}。时间点留痕清晰，展现出规律的生活节奏与自驱力。`;
+      sampleHabitHighlights.push(`习惯时效画像：${habitSummaries[0] || '保持按时打卡'}`);
+    } else {
+      habitInsightText = `在日常习惯方面，本周期记录了习惯打卡 ${params.checkInCount} 次，建议在当天及时打卡记录精确的时间点。`;
+      sampleHabitHighlights.push(`累计完成日常习惯打卡 ${params.checkInCount} 次`);
+    }
+
     return {
-      content: `在本次${params.type}度周期中，累计处理待办任务 ${params.tasksTotal} 项，按期达成 ${params.tasksCompleted} 项（完成率约 ${rate}%）。在此期间沉淀了 ${params.reflectionCount} 篇深度反思，完成习惯打卡 ${params.checkInCount} 次。整体节奏稳定自洽，各项核心习惯逐步巩固。`,
+      content: `在本次${params.type}度周期中，累计处理待办任务 ${params.tasksTotal} 项，按期达成 ${params.tasksCompleted} 项（完成率约 ${rate}%）。在此期间沉淀了 ${params.reflectionCount} 篇闭环反思。${habitInsightText}`,
       themes: [
-        { name: '学习', direction: '改善', weight: 8 },
-        { name: '项目', direction: '改善', weight: 6 },
+        { name: '习惯', direction: '改善', weight: 8 },
+        { name: '学习', direction: '改善', weight: 6 },
         { name: '健康', direction: rate >= 75 ? '改善' : '稳定', weight: 4 },
       ],
       highlights: [
         `按期达成 ${params.tasksCompleted} 项核心工作与学习任务`,
-        `累计打卡 ${params.checkInCount} 次，保持稳定日常自驱节拍`,
-        `输出 ${params.reflectionCount} 篇闭环反思，夯实行为证据链`,
+        ...sampleHabitHighlights,
+        `输出 ${params.reflectionCount} 篇深度反思，行为证据链扎实留存`,
       ],
       taskSuggestions: [
-        '制定下一周期核心目标攻坚时间表',
-        '建立每周固定深度复盘与整理机制',
-        '保持作息规律并增加体能训练频次',
+        '保持核心习惯在固定时间段的打卡节奏',
+        '制定下一周期重点攻坚事项的时间规划',
+        '建立每周固定深度复盘与时间流速检查机制',
       ],
     };
   }

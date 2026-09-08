@@ -28,6 +28,8 @@ export const App: React.FC = () => {
     changeTaskStatus,
     isBiometricLocked,
     praiseToast,
+    undoToast,
+    dismissUndoToast,
     theme,
     settingsOpen,
     setSettingsOpen,
@@ -121,6 +123,25 @@ export const App: React.FC = () => {
           <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-200 animate-fade-in">
             <div className="bg-slate-900/90 backdrop-blur-md text-white text-xs font-medium px-4 py-2 rounded-2xl shadow-xl border border-white/20">
               {exitToast}
+            </div>
+          </div>
+        )}
+
+        {/* 3-Second Interactive Undo Toast */}
+        {undoToast && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 transition-all duration-200 animate-fadeIn">
+            <div className="bg-slate-900/95 backdrop-blur-md text-white text-xs font-medium px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20">
+              <span>{undoToast.message}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  undoToast.onUndo();
+                  dismissUndoToast();
+                }}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition-colors shadow-xs active:scale-95"
+              >
+                {undoToast.undoText || '撤销'}
+              </button>
             </div>
           </div>
         )}

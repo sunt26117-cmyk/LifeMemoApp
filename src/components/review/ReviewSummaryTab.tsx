@@ -8,7 +8,7 @@ import { getPeriodKey } from '../../services/storage';
 import { getThemeColors } from '../../utils/themeStyles';
 
 export const ReviewSummaryTab: React.FC = () => {
-  const { summaries, addSummary, tasks, checkInRecords, reflections, theme } = useApp();
+  const { summaries, addSummary, tasks, checkInRecords, checkInTypes, reflections, theme } = useApp();
   const themeColors = getThemeColors(theme);
   const [summaryType, setSummaryType] = useState<SummaryType>('周');
   const [generatingSummary, setGeneratingSummary] = useState(false);
@@ -38,12 +38,14 @@ export const ReviewSummaryTab: React.FC = () => {
 
       const res = await AiService.generatePeriodicSummary({
         type: summaryType,
-        periodStart: new Date(Date.now() - 7 * 86400000).toISOString(),
+        periodStart: new Date(Date.now() - (summaryType === '周' ? 7 : summaryType === '月' ? 30 : 365) * 86400000).toISOString(),
         periodEnd: new Date().toISOString(),
         tasksCompleted: completed,
         tasksTotal: total,
         checkInCount: chk,
         reflectionCount: refCount,
+        checkInRecords,
+        checkInTypes,
       });
 
       addSummary({

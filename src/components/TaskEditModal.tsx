@@ -48,12 +48,14 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
 
   // 预估时间与单位
   const [durationValue, setDurationValue] = useState<number>(1);
+  const [durationInput, setDurationInput] = useState<string>('1');
   const [durationUnit, setDurationUnit] = useState<TimeUnit>('天');
 
   // 子任务与新建子任务输入
   const [steps, setSteps] = useState<TaskStep[]>([]);
   const [newStepText, setNewStepText] = useState('');
   const [newStepDurationValue, setNewStepDurationValue] = useState<number>(1);
+  const [newStepDurationInput, setNewStepDurationInput] = useState<string>('1');
   const [newStepDurationUnit, setNewStepDurationUnit] = useState<TimeUnit>('天');
 
   const [decomposing, setDecomposing] = useState(false);
@@ -80,24 +82,26 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         }
 
         // 还原预估时间与单位
+        let initDuration = 1;
+        let initUnit: TimeUnit = '天';
         if (task.estimatedDurationValue != null && task.estimatedDurationValue > 0) {
-          setDurationValue(task.estimatedDurationValue);
-          setDurationUnit(task.estimatedDurationUnit || '天');
+          initDuration = task.estimatedDurationValue;
+          initUnit = task.estimatedDurationUnit || '天';
         } else if (task.estimatedMinutes != null && task.estimatedMinutes > 0) {
           if (task.estimatedMinutes >= 1440 && task.estimatedMinutes % 1440 === 0) {
-            setDurationValue(task.estimatedMinutes / 1440);
-            setDurationUnit('天');
+            initDuration = task.estimatedMinutes / 1440;
+            initUnit = '天';
           } else if (task.estimatedMinutes >= 60 && task.estimatedMinutes % 60 === 0) {
-            setDurationValue(task.estimatedMinutes / 60);
-            setDurationUnit('小时');
+            initDuration = task.estimatedMinutes / 60;
+            initUnit = '小时';
           } else {
-            setDurationValue(task.estimatedMinutes);
-            setDurationUnit('分钟');
+            initDuration = task.estimatedMinutes;
+            initUnit = '分钟';
           }
-        } else {
-          setDurationValue(1);
-          setDurationUnit('天');
         }
+        setDurationValue(initDuration);
+        setDurationInput(String(initDuration));
+        setDurationUnit(initUnit);
 
         const baseStart = task.startTime ? task.startTime.slice(0, 16) : getLocalISOString();
         const initialSteps = task.steps ? [...task.steps] : [];
@@ -114,11 +118,13 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         setCustomInterval(1);
         setCustomUnit('天');
         setDurationValue(1);
+        setDurationInput('1');
         setDurationUnit('天');
         setSteps([]);
       }
       setNewStepText('');
       setNewStepDurationValue(1);
+      setNewStepDurationInput('1');
       setNewStepDurationUnit('天');
       setDecomposing(false);
       setIsAddingCategory(false);
@@ -158,7 +164,11 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   // 添加单个子任务
   const handleAddStep = () => {
     if (!newStepText.trim()) return;
-    const safeDuration = Math.max(0.5, Math.round((newStepDurationValue || 1) * 2) / 2);
+    const parsedNewStep = parseFloat(newStepDurationInput);
+    const safeDuration =
+      !isNaN(parsedNewStep) && parsedNewStep >= 0.5
+        ? Math.round(parsedNewStep * 2) / 2
+        : Math.max(0.5, Math.round((newStepDurationValue || 1) * 2) / 2);
     const newStep: TaskStep = {
       content: newStepText.trim(),
       done: false,
@@ -168,6 +178,8 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     const updated = [...steps, newStep];
     setSteps(computeStepsTimeline(startTime, updated));
     setNewStepText('');
+    setNewStepDurationValue(1);
+    setNewStepDurationInput('1');
   };
 
   // 切换完成状态
@@ -224,8 +236,13 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     if (!title.trim()) return;
 
     // 提交前最终基于当前开始时间重算一次时间轴与延期状态
+    const parsedDuration = parseFloat(durationInput);
+    const finalDurationValue =
+      !isNaN(parsedDuration) && parsedDuration >= 0.5
+        ? Math.round(parsedDuration * 2) / 2
+        : durationValue;
     const finalSteps = computeStepsTimeline(startTime, steps);
-    const estimatedMins = durationToMinutes(durationValue, durationUnit);
+    const estimatedMins = durationToMinutes(finalDurationValue, durationUnit);
 
     const taskPayload = {
       title: title.trim(),
@@ -243,7 +260,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             }
           : null,
       estimatedMinutes: estimatedMins,
-      estimatedDurationValue: durationValue,
+      estimatedDurationValue: finalDurationValue,
       estimatedDurationUnit: durationUnit,
       steps: finalSteps,
     };
@@ -450,10 +467,20 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                     type="number"
                     min={0.5}
                     step={0.5}
-                    value={durationValue}
+                    placeholder="0.5"
+                    value={durationInput}
                     onChange={(e) => {
+                      setDurationInput(e.target.value);
                       const val = parseFloat(e.target.value);
-                      setDurationValue(!isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5);
+                      if (!isNaN(val) && val >= 0.5) {
+                        setDurationValue(Math.round(val * 2) / 2);
+                      }
+                    }}
+                    onBlur={() => {
+                      const val = parseFloat(durationInput);
+                      const aligned = !isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5;
+                      setDurationValue(aligned);
+                      setDurationInput(String(aligned));
                     }}
                     className={`flex-1 text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing} font-mono font-medium`}
                   />
@@ -582,14 +609,19 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                           type="number"
                           min={0.5}
                           step={0.5}
-                          value={step.durationValue ?? 1}
-                          onChange={(e) =>
+                          placeholder="0.5"
+                          defaultValue={step.durationValue ?? 1}
+                          key={step.id + '_' + (step.durationValue ?? 1)}
+                          onBlur={(e) => {
+                            const raw = parseFloat(e.target.value);
+                            const aligned = !isNaN(raw) && raw >= 0.5 ? Math.round(raw * 2) / 2 : 0.5;
+                            e.target.value = String(aligned);
                             handleStepDurationChange(
                               idx,
-                              parseFloat(e.target.value) || 0.5,
+                              aligned,
                               step.durationUnit || durationUnit
-                            )
-                          }
+                            );
+                          }}
                           className="w-14 p-1 text-center bg-slate-50 border border-slate-200 rounded-md text-[10px] font-mono font-medium"
                         />
                         <select
@@ -648,10 +680,20 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                   type="number"
                   min={0.5}
                   step={0.5}
-                  value={newStepDurationValue}
+                  placeholder="0.5"
+                  value={newStepDurationInput}
                   onChange={(e) => {
+                    setNewStepDurationInput(e.target.value);
                     const val = parseFloat(e.target.value);
-                    setNewStepDurationValue(!isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5);
+                    if (!isNaN(val) && val >= 0.5) {
+                      setNewStepDurationValue(Math.round(val * 2) / 2);
+                    }
+                  }}
+                  onBlur={() => {
+                    const val = parseFloat(newStepDurationInput);
+                    const aligned = !isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5;
+                    setNewStepDurationValue(aligned);
+                    setNewStepDurationInput(String(aligned));
                   }}
                   className="w-14 py-1.5 text-center text-xs bg-white border border-slate-200 rounded-lg font-mono font-medium"
                 />

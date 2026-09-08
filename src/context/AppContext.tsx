@@ -1,5 +1,5 @@
 // src/context/AppContext.tsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import {
   AppTheme,
   CancelType,
@@ -79,8 +79,9 @@ interface AppContextType {
     date: string,
     type: CheckInType,
     mode?: 'overwrite' | 'toggle'
-  ) => { status: 'created' | 'updated' | 'removed'; record: CheckInRecord | null; previousTime?: string };
+  ) => { status: 'created' | 'updated' | 'removed' | 'rejected'; record: CheckInRecord | null; previousTime?: string };
   checkInRecords: CheckInRecord[];
+  getRecordsByDate: (date: string) => CheckInRecord[];
 
   trends: Trend[];
   themes: ThemeItem[];
@@ -109,6 +110,11 @@ interface AppContextType {
   // 1-Second Praise Toast
   praiseToast: string | null;
   showPraise: (msg: string) => void;
+
+  // 3-Second Undo Toast
+  undoToast: { id: string; message: string; undoText?: string; onUndo: () => void } | null;
+  showUndoToast: (message: string, onUndo: () => void, undoText?: string) => void;
+  dismissUndoToast: () => void;
 
   // Dynamic Task Categories (偏向个人私生活 & 自由增删)
   taskCategories: string[];
@@ -181,6 +187,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTimeout(() => {
       setPraiseToast((cur) => (cur === msg ? null : cur));
     }, 1000);
+  };
+
+  // 3-second interactive undo toast state
+  const [undoToast, setUndoToast] = useState<{
+    id: string;
+    message: string;
+    undoText?: string;
+    onUndo: () => void;
+  } | null>(null);
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismissUndoToast = () => {
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+    setUndoToast(null);
+  };
+
+  const showUndoToast = (message: string, onUndo: () => void, undoText: string = '撤销') => {
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+    const id = newUuid();
+    setUndoToast({ id, message, undoText, onUndo });
+    undoTimeoutRef.current = setTimeout(() => {
+      setUndoToast((cur) => (cur?.id === id ? null : cur));
+      undoTimeoutRef.current = null;
+    }, 3000);
   };
 
   // Dynamic Task Categories
@@ -492,11 +527,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCheckInTypes(AppStorage.getCheckInTypes());
   };
 
+  const getRecordsByDate = useCallback(
+    (date: string): CheckInRecord[] => {
+      return checkInRecords.filter((r) => r.date === date);
+    },
+    [checkInRecords]
+  );
+
   const toggleCheckIn = (
     date: string,
     type: CheckInType,
     mode: 'overwrite' | 'toggle' = 'overwrite'
   ) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (date !== todayStr) {
+      if (date > todayStr) {
+        showPraise('未来日期尚未到来，暂不能预先打卡');
+      } else {
+        showPraise('历史日期仅供查阅打卡记录，不能补卡或改写');
+      }
+      return { status: 'rejected' as const, record: null };
+    }
+
+    const prevRecords = [...checkInRecords];
+    const existing = prevRecords.find((r) => r.date === date && r.typeId === type.id);
     const result = AppStorage.toggleCheckIn(date, type, mode);
     setCheckInRecords(AppStorage.getCheckInRecords());
 
@@ -506,10 +560,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (date === todayStr) {
         habitNotificationService.onHabitCompletedToday(type.id);
       }
+      // 3-second undo toast
+      const timeStr = result.record?.checkInTime || '刚刚';
+      showUndoToast(`已打卡【${type.name}】(${timeStr})`, () => {
+        AppStorage.toggleCheckIn(date, type, 'toggle');
+        setCheckInRecords(AppStorage.getCheckInRecords());
+      });
     } else if (result.status === 'updated') {
       const timeMsg = result.record?.checkInTime ? `已更新打卡时间：${result.record.checkInTime}` : '已刷新打卡';
       const prevMsg = result.previousTime ? `（覆盖上次 ${result.previousTime}）` : '';
       showPraise(`${timeMsg}${prevMsg}`);
+      // 3-second undo toast for update
+      if (existing) {
+        showUndoToast(`已更新【${type.name}】时间为 ${result.record?.checkInTime}`, () => {
+          AppStorage.saveCheckInRecords(prevRecords);
+          setCheckInRecords(AppStorage.getCheckInRecords());
+        });
+      }
+    } else if (result.status === 'removed') {
+      if (existing) {
+        showUndoToast(
+          `已撤销【${type.name}】打卡`,
+          () => {
+            AppStorage.saveCheckInRecords(prevRecords);
+            setCheckInRecords(AppStorage.getCheckInRecords());
+          },
+          '恢复'
+        );
+      }
     }
 
     return result;
@@ -622,6 +700,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCheckInType,
         toggleCheckIn,
         checkInRecords,
+        getRecordsByDate,
         trends,
         themes,
         summaries,
@@ -633,6 +712,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         restoreItem,
         praiseToast,
         showPraise,
+        undoToast,
+        showUndoToast,
+        dismissUndoToast,
         taskCategories,
         addTaskCategory,
         deleteTaskCategory,

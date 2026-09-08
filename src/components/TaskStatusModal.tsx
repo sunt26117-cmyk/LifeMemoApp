@@ -48,6 +48,12 @@ export const TaskStatusModal: React.FC<TaskStatusModalProps> = ({
     }
     return 1;
   });
+  const [durationInput, setDurationInput] = useState<string>(() => {
+    if (task?.estimatedDurationValue != null && task.estimatedDurationValue >= 0.5) {
+      return String(Math.round(task.estimatedDurationValue * 2) / 2);
+    }
+    return '1';
+  });
 
   const [selectedImprovements, setSelectedImprovements] = useState<string[]>([
     '提前规划时间',
@@ -86,10 +92,12 @@ export const TaskStatusModal: React.FC<TaskStatusModalProps> = ({
 
   const handleSave = () => {
     if (targetStatus === '已完成') {
-      const calculatedMins = durationToMinutes(durationValue, durationUnit);
+      const parsed = parseFloat(durationInput);
+      const finalDuration = !isNaN(parsed) && parsed >= 0.5 ? Math.round(parsed * 2) / 2 : durationValue;
+      const calculatedMins = durationToMinutes(finalDuration, durationUnit);
       onConfirm({
         durationMinutes: calculatedMins,
-        durationValue,
+        durationValue: finalDuration,
         durationUnit,
         behaviorImprovement: selectedImprovements,
       });
@@ -203,10 +211,20 @@ export const TaskStatusModal: React.FC<TaskStatusModalProps> = ({
                   type="number"
                   min={0.5}
                   step={0.5}
-                  value={durationValue}
+                  placeholder="0.5"
+                  value={durationInput}
                   onChange={(e) => {
+                    setDurationInput(e.target.value);
                     const val = parseFloat(e.target.value);
-                    setDurationValue(!isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5);
+                    if (!isNaN(val) && val >= 0.5) {
+                      setDurationValue(Math.round(val * 2) / 2);
+                    }
+                  }}
+                  onBlur={() => {
+                    const val = parseFloat(durationInput);
+                    const aligned = !isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5;
+                    setDurationValue(aligned);
+                    setDurationInput(String(aligned));
                   }}
                   className={`w-24 text-center text-xs py-1.5 px-2 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing} font-mono font-medium`}
                 />
@@ -229,7 +247,10 @@ export const TaskStatusModal: React.FC<TaskStatusModalProps> = ({
                   <button
                     key={val}
                     type="button"
-                    onClick={() => setDurationValue(val)}
+                    onClick={() => {
+                      setDurationValue(val);
+                      setDurationInput(String(val));
+                    }}
                     className={`py-1 px-2.5 text-xs rounded-lg border transition-colors ${
                       durationValue === val
                         ? `${themeColors.subtleBg} border ${themeColors.subtleBorder} ${themeColors.primaryText} font-semibold`

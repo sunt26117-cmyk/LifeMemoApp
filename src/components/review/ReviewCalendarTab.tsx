@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getLunarDisplay } from '../../utils/lunarUtil';
 import { ManageHabitsModal } from './ManageHabitsModal';
+import { DayCheckInDetailModal } from '../checkin/DayCheckInDetailModal';
 import { getThemeColors } from '../../utils/themeStyles';
 
 export const ReviewCalendarTab: React.FC = () => {
@@ -11,6 +12,7 @@ export const ReviewCalendarTab: React.FC = () => {
   const themeColors = getThemeColors(theme);
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [showManageTypesModal, setShowManageTypesModal] = useState(false);
+  const [selectedDayDetail, setSelectedDayDetail] = useState<string | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const anchorDateStr = statAnchorDate ? statAnchorDate.split('T')[0] : null;
@@ -136,9 +138,12 @@ export const ReviewCalendarTab: React.FC = () => {
             const dayRecords = validCheckInRecords.filter((r) => r.date === item.dateStr);
 
             return (
-              <div
+              <button
                 key={idx}
-                className={`min-h-[52px] p-1 rounded-xl flex flex-col items-center justify-between transition-colors border ${
+                type="button"
+                onClick={() => setSelectedDayDetail(item.dateStr)}
+                title={`点击查看 ${item.dateStr} 当日打卡详情与时间点`}
+                className={`min-h-[52px] p-1 rounded-xl flex flex-col items-center justify-between transition-colors border text-center cursor-pointer ${
                   !item.isCurrentMonth
                     ? 'opacity-30 border-transparent'
                     : isToday
@@ -172,7 +177,7 @@ export const ReviewCalendarTab: React.FC = () => {
                     <span className={`w-1 h-1 rounded-full ${themeColors.textSub}`} />
                   )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -216,6 +221,12 @@ export const ReviewCalendarTab: React.FC = () => {
       <ManageHabitsModal
         isOpen={showManageTypesModal}
         onClose={() => setShowManageTypesModal(false)}
+      />
+
+      <DayCheckInDetailModal
+        isOpen={!!selectedDayDetail}
+        onClose={() => setSelectedDayDetail(null)}
+        dateStr={selectedDayDetail || todayStr}
       />
     </div>
   );

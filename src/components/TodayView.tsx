@@ -19,6 +19,7 @@ import { getLunarDisplay } from '../utils/lunarUtil';
 import { Task, TaskStatus } from '../types';
 import { getThemeColors } from '../utils/themeStyles';
 import { ManageHabitsModal } from './review/ManageHabitsModal';
+import { CollapsibleCheckInList } from './checkin/CollapsibleCheckInList';
 
 interface TodayViewProps {
   onOpenTaskCreate: (title?: string) => void;
@@ -170,92 +171,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Habits Check-in Bar */}
-      <div className={`${themeColors.cardBg} rounded-2xl p-4 border ${themeColors.cardBorder} shadow-xs transition-colors`}>
-        <div className="flex items-center justify-between mb-2.5">
-          <span className={`text-xs font-semibold ${themeColors.textMain} flex items-center gap-1`}>
-            <span>今日习惯打卡</span>
-            <span className={`text-[10px] ${themeColors.textSub} font-normal`}>（点击直接完成）</span>
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsManageHabitsOpen(true)}
-              className={`text-[11px] ${themeColors.primaryText} hover:underline flex items-center gap-1 font-medium`}
-              title="设置习惯固定时间段、手机通知栏提醒与防打扰规则"
-            >
-              <Clock className="w-3 h-3" />
-              <span>时段与提醒</span>
-            </button>
-            <span className="text-slate-300">|</span>
-            <button
-              onClick={() => setActiveTab('review')}
-              className={`text-[11px] ${themeColors.primaryText} hover:underline flex items-center font-medium`}
-            >
-              <span>日历全景</span>
-              <ArrowRight className="w-3 h-3 ml-0.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {checkInTypes
-            .filter((t) => t.enabled)
-            .map((type) => {
-              const checkRecord = todayCheckIns.find((r) => r.typeId === type.id);
-              const isChecked = !!checkRecord;
-              const hasReminder = type.reminder?.enabled;
-              const timeDisplay = type.reminder?.targetStartTime || type.reminder?.reminderTime;
-              const checkedTimeStr =
-                checkRecord?.checkInTime ||
-                (checkRecord?.createdAt ? new Date(checkRecord.createdAt).toTimeString().slice(0, 5) : '');
-
-              return (
-                <div key={type.id} className="relative group shrink-0">
-                  <button
-                    onClick={() => toggleCheckIn(todayStr, type, 'overwrite')}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border ${
-                      isChecked
-                        ? 'bg-emerald-100/80 border-emerald-300 text-emerald-900 shadow-xs'
-                        : `${themeColors.subtleBg} ${themeColors.subtleBorder} ${themeColors.textMain} ${themeColors.subtleHoverBg}`
-                    }`}
-                    title={
-                      isChecked
-                        ? `已于 ${checkedTimeStr} 打卡。再次点击可覆盖更新为当前时间；点击右上角 × 可撤销`
-                        : hasReminder
-                        ? `计划时段: ${timeDisplay}`
-                        : '点击打卡'
-                    }
-                  >
-                    <span className="text-sm">{type.symbol}</span>
-                    <span>{type.name}</span>
-                    {isChecked ? (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono bg-emerald-200/80 text-emerald-900 px-1.5 py-0.5 rounded-md font-semibold ml-0.5">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                        {checkedTimeStr}
-                      </span>
-                    ) : hasReminder ? (
-                      <span className="text-[10px] text-slate-400 font-mono font-normal">
-                        {timeDisplay}
-                      </span>
-                    ) : null}
-                  </button>
-                  {isChecked && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleCheckIn(todayStr, type, 'toggle');
-                      }}
-                      className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-400/80 hover:bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[11px] leading-none shadow-xs"
-                      title="撤销打卡"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-        </div>
-      </div>
+      {/* Collapsible Check-In List with Top Calendar Strip & Multi-Option Capsule System */}
+      <CollapsibleCheckInList onOpenManageHabits={() => setIsManageHabitsOpen(true)} />
 
       {/* 4 Quick Entry Action Cards */}
       <div className="grid grid-cols-4 gap-2">

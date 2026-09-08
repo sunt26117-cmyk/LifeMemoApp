@@ -440,11 +440,21 @@ export class AppStorage {
   static saveCheckInRecords(items: CheckInRecord[]): void {
     setLocal(STORAGE_KEYS.CHECKIN_RECORDS, items);
   }
+  static getRecordsByDate(date: string): CheckInRecord[] {
+    const records = this.getCheckInRecords();
+    return records.filter((r) => r.date === date);
+  }
   static toggleCheckIn(
     date: string,
     type: CheckInType,
     mode: 'overwrite' | 'toggle' = 'overwrite'
-  ): { status: 'created' | 'updated' | 'removed'; record: CheckInRecord | null; previousTime?: string } {
+  ): { status: 'created' | 'updated' | 'removed' | 'rejected'; record: CheckInRecord | null; previousTime?: string } {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    // 黄金规则与用户明确要求：除今天外，历史日期与未来日期均禁止打卡或改动
+    if (date !== todayStr) {
+      return { status: 'rejected', record: null };
+    }
+
     const items = this.getCheckInRecords();
     const existingIdx = items.findIndex((r) => r.date === date && r.typeId === type.id);
     const now = new Date();
