@@ -9,6 +9,7 @@ import { NoteCard } from './records/NoteCard';
 import { PhotoGrid } from './records/PhotoGrid';
 import { DeleteConfirmationModal } from './records/DeleteConfirmationModal';
 import { getThemeColors } from '../utils/themeStyles';
+import { ListPaginationControl } from './ListPaginationControl';
 
 interface RecordsViewProps {
   onOpenMemoryCreate: () => void;
@@ -44,6 +45,16 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'memories' | 'notes'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Pagination state: >10 items auto-hide with Show More / Collapse
+  const [notesVisibleCount, setNotesVisibleCount] = useState(10);
+  const [memoriesVisibleCount, setMemoriesVisibleCount] = useState(10);
+
+  // Reset pagination when search, filter or tab changes
+  React.useEffect(() => {
+    setNotesVisibleCount(10);
+    setMemoriesVisibleCount(10);
+  }, [searchQuery, selectedTag, activeSubTab]);
 
   // Dual-track deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -229,7 +240,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               </span>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {filteredNotes.map((note) => (
+              {filteredNotes.slice(0, notesVisibleCount).map((note) => (
                 <NoteCard
                   key={note.id}
                   note={note}
@@ -245,6 +256,15 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                 />
               ))}
             </div>
+
+            {/* Pagination Controls for Notes */}
+            <ListPaginationControl
+              totalCount={filteredNotes.length}
+              visibleCount={notesVisibleCount}
+              onShowMore={() => setNotesVisibleCount((prev) => prev + 10)}
+              onCollapse={() => setNotesVisibleCount(10)}
+              itemName="条便签"
+            />
           </div>
         )}
 
@@ -261,21 +281,32 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                 暂无匹配的记录内容
               </div>
             ) : (
-              filteredMemories.map((mem) => (
-                <MemoryCard
-                  key={mem.id}
-                  memory={mem}
-                  onEdit={onOpenMemoryEdit}
-                  onDelete={(id) => {
-                    setDeleteTarget({
-                      type: 'memory',
-                      id,
-                      title: '删除日记/事实记录',
-                      description: mem.title ? `${mem.title} - ${mem.content}` : mem.content,
-                    });
-                  }}
+              <>
+                {filteredMemories.slice(0, memoriesVisibleCount).map((mem) => (
+                  <MemoryCard
+                    key={mem.id}
+                    memory={mem}
+                    onEdit={onOpenMemoryEdit}
+                    onDelete={(id) => {
+                      setDeleteTarget({
+                        type: 'memory',
+                        id,
+                        title: '删除日记/事实记录',
+                        description: mem.title ? `${mem.title} - ${mem.content}` : mem.content,
+                      });
+                    }}
+                  />
+                ))}
+
+                {/* Pagination Controls for Memories */}
+                <ListPaginationControl
+                  totalCount={filteredMemories.length}
+                  visibleCount={memoriesVisibleCount}
+                  onShowMore={() => setMemoriesVisibleCount((prev) => prev + 10)}
+                  onCollapse={() => setMemoriesVisibleCount(10)}
+                  itemName="条日记记录"
                 />
-              ))
+              </>
             )}
           </div>
         )}

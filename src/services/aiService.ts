@@ -1,7 +1,14 @@
 // src/services/aiService.ts
-import { ContextPack, ReflectionSummary, SummaryType } from '../types';
+import { ContextPack, ReflectionSummary, SummaryType, TimeUnit } from '../types';
 import { validate } from '../utils/validator';
 import { AppStorage } from './storage';
+import { distributeDuration } from '../utils/taskTimeUtil';
+
+export interface DecomposedStepWithDuration {
+  content: string;
+  durationValue: number;
+  durationUnit: TimeUnit;
+}
 
 const PROMPT_TAIL = `
 【通用约束】
@@ -225,9 +232,24 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
   }
 
   /**
-   * 任务步骤拆解 (3-5 步，动词开头)
+   * 任务步骤智能拆解（支持根据总预估时间自动分配各步骤耗时）
    */
-  static async decomposeTask(taskTitle: string, description?: string): Promise<string[]> {
+  static async decomposeTaskWithDurations(
+    taskTitle: string,
+    description?: string,
+    totalDuration?: { value: number; unit: TimeUnit }
+  ): Promise<DecomposedStepWithDuration[]> {
+    const defaultUnit: TimeUnit = totalDuration?.unit || '天';
+    const defaultValue: number = totalDuration?.value && totalDuration.value > 0 ? totalDuration.value : 3;
+
+    // 换算为预估天数
+    let totalDays = defaultValue;
+    if (defaultUnit === '周') totalDays = defaultValue * 7;
+    else if (defaultUnit === '月') totalDays = defaultValue * 30;
+    else if (defaultUnit === '小时') totalDays = Math.max(0.5, Math.round((defaultValue / 24) * 2) / 2);
+    else if (defaultUnit === '分钟') totalDays = Math.max(0.5, Math.round((defaultValue / 1440) * 2) / 2);
+    totalDays = Math.max(0.5, Math.round(totalDays * 2) / 2);
+
     const apiKey = AppStorage.getApiKey();
     if (apiKey) {
       try {
@@ -243,32 +265,76 @@ ${JSON.stringify(params.contextPack, null, 2)}`,
             messages: [
               {
                 role: 'system',
-                content: `请把任务拆解为 3-5 个具体执行步骤。每步必须以动词白名单开头：制定/列出/写/记录/确认/设置/添加/使用/建立/执行/保存/检查/创建/安排/发送/准备/复习/更新/关闭/开启。
-输出 JSON: { "steps": ["步骤1", "步骤2", "步骤3"] }`,
+                content: `你是一个高效敏捷的任务拆解专家。请把用户任务拆解为 3-5 个具体执行子步骤。
+规则：
+1. 每步内容必须以动词白名单开头：制定/列出/写/记录/确认/设置/添加/使用/建立/执行/保存/检查/创建/安排/发送/准备/复习/更新/关闭/开启。
+2. 任务总预估时长为：${totalDays} 天。
+3. 请为每个子步骤分配预计耗时：子步骤最小单位为 0.5 天（例如 0.5, 1.0, 1.5, 2.0 等），单位固定为 '天'，所有子步骤耗时相加必须等于 ${totalDays} 天。
+输出标准 JSON 格式：
+{
+  "steps": [
+    { "content": "确认需求与制定执行框架", "durationValue": 0.5, "durationUnit": "天" },
+    { "content": "执行核心落地推进", "durationValue": 1.5, "durationUnit": "天" },
+    { "content": "检查成果并复核交付", "durationValue": 1.0, "durationUnit": "天" }
+  ]
+}`,
               },
-              { role: 'user', content: `任务：${taskTitle}\n说明：${description || '无'}` },
+              { role: 'user', content: `任务标题：${taskTitle}\n任务说明：${description || '无'}\n总预估时间：${totalDays} 天` },
             ],
           }),
         });
+
         if (response.ok) {
           const data = await response.json();
           const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
           if (Array.isArray(parsed.steps) && parsed.steps.length >= 2) {
-            return parsed.steps;
+            const count = parsed.steps.length;
+            const distributedFallback = distributeDuration(totalDays, '天', count);
+
+            return parsed.steps.map((item: any, idx: number) => {
+              const content = typeof item === 'string' ? item : String(item.content || '').trim() || `执行步骤 ${idx + 1}`;
+              const rawVal = typeof item === 'string' ? distributedFallback[idx].value : Number(item.durationValue);
+              // 确保最小 0.5 天且为 0.5 的倍数
+              const stepVal = !isNaN(rawVal) && rawVal >= 0.5
+                ? Math.round(rawVal * 2) / 2
+                : distributedFallback[idx]?.value || 0.5;
+
+              return {
+                content,
+                durationValue: stepVal,
+                durationUnit: '天',
+              };
+            });
           }
         }
       } catch (err) {
-        console.warn('Task decompose failed:', err);
+        console.warn('Task decompose with duration failed:', err);
       }
     }
 
-    // Local fallback
-    return [
-      `确认${taskTitle}的核心要求与截止时间`,
+    // Local fallback with smart distributed duration
+    const fallbackContents = [
+      `确认${taskTitle}的核心要求与具体交付物`,
       `准备所需材料与执行环境`,
       `执行关键推进并记录过程要点`,
-      `检查成果物并归档交付`,
+      `检查成果物并归档复盘`,
     ];
+
+    const distributed = distributeDuration(totalDays, '天', fallbackContents.length);
+
+    return fallbackContents.map((content, idx) => ({
+      content,
+      durationValue: distributed[idx].value,
+      durationUnit: '天',
+    }));
+  }
+
+  /**
+   * 任务步骤拆解 (兼容旧接口)
+   */
+  static async decomposeTask(taskTitle: string, description?: string): Promise<string[]> {
+    const list = await AiService.decomposeTaskWithDurations(taskTitle, description);
+    return list.map((s) => s.content);
   }
 
   /**

@@ -1,6 +1,7 @@
 // src/hooks/useAndroidNavigation.ts
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { modalBackManager } from '../services/modalBackManager';
 
 export type MainTabType = 'today' | 'records' | 'tasks' | 'review';
 
@@ -45,7 +46,12 @@ export function useAndroidNavigation({
     const setupListener = async () => {
       try {
         const handler = await CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-          // Check if any modal is open
+          // 1. Check nested dynamic modals (e.g. ManageHabitsModal, HabitReminderModal)
+          if (modalBackManager.handleBack()) {
+            return;
+          }
+
+          // 2. Check if any top-level modal is open
           const currentHandlers = handlersRef.current;
           const openHandler = currentHandlers.find((h) => h.isOpen);
 
@@ -81,6 +87,10 @@ export function useAndroidNavigation({
 
     // Browser / PWA fallback for back navigation
     const handlePopState = (e: PopStateEvent) => {
+      if (modalBackManager.handleBack()) {
+        e.preventDefault();
+        return;
+      }
       const openHandler = handlersRef.current.find((h) => h.isOpen);
       if (openHandler) {
         e.preventDefault();

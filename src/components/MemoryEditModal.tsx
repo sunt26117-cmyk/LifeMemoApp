@@ -5,6 +5,7 @@ import { Memory } from '../types';
 import { useApp } from '../context/AppContext';
 import { AiService } from '../services/aiService';
 import { getCityNameFromCoords, requestAndGetCurrentPosition } from '../utils/geoUtil';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface MemoryEditModalProps {
   isOpen: boolean;
@@ -19,7 +20,8 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
   memory,
   onClose,
 }) => {
-  const { addMemory, updateMemory, addPhoto, photos } = useApp();
+  const { addMemory, updateMemory, addPhoto, photos, theme } = useApp();
+  const themeColors = getThemeColors(theme);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [title, setTitle] = useState(memory?.title || '');
@@ -201,7 +203,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className={`bg-white rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
         <button
           onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
@@ -221,7 +223,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
               placeholder="简要概括主题，留空自动提取"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A90D9]"
+              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -235,7 +237,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
               placeholder="记录今天发生的事实、灵感或对话细节..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A90D9]"
+              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -316,13 +318,13 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                <Camera className="w-3.5 h-3.5 text-[#4A90D9]" />
+                <Camera className={`w-3.5 h-3.5 ${themeColors.primaryText}`} />
                 <span>配图相册（支持多图上传）</span>
               </label>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] text-[#4A90D9] hover:text-[#3a7bbb] font-medium flex items-center gap-1 bg-sky-50 px-2 py-0.5 rounded-lg"
+                className={`text-[11px] ${themeColors.primaryText} font-medium flex items-center gap-1 ${themeColors.subtleBg} px-2 py-0.5 rounded-lg hover:opacity-85`}
               >
                 <Plus className="w-3 h-3" />
                 <span>上传照片/拍照</span>
@@ -365,7 +367,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
                 type="button"
                 onClick={handleGenerateSummary}
                 disabled={generating || !content.trim()}
-                className="flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                className="flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 disabled:opacity-50 font-medium"
               >
                 <Sparkles className="w-3 h-3" />
                 <span>{generating ? '生成中...' : '生成客观摘要'}</span>
@@ -376,7 +378,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
               placeholder="点击右上角自动提炼，或手动编辑..."
               value={aiSummary}
               onChange={(e) => setAiSummary(e.target.value)}
-              className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#4A90D9]"
+              className={`w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -387,7 +389,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
               {tags.map((t) => (
                 <span
                   key={t}
-                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-sky-50 text-[#4A90D9] rounded-full font-medium"
+                  className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 ${themeColors.subtleBg} ${themeColors.primaryText} rounded-full font-medium border ${themeColors.subtleBorder}`}
                 >
                   #{t}
                   <button
@@ -407,7 +409,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                className="flex-1 text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#4A90D9]"
+                className={`flex-1 text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none ${themeColors.focusRing}`}
               />
               <button
                 type="button"
@@ -438,12 +440,18 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
                         }
                       }}
                       className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${
-                        isSelected ? 'border-[#4A90D9] scale-95 shadow-sm' : 'border-transparent'
+                        isSelected ? 'scale-95 shadow-sm' : 'border-transparent'
                       }`}
+                      style={{
+                        borderColor: isSelected ? themeColors.primaryHex : 'transparent',
+                      }}
                     >
                       <img src={p.localPath} alt="" className="w-full h-full object-cover" />
                       {isSelected && (
-                        <div className="absolute inset-0 bg-[#4A90D9]/30 flex items-center justify-center text-white font-bold text-xs">
+                        <div
+                          className="absolute inset-0 flex items-center justify-center text-white font-bold text-xs"
+                          style={{ backgroundColor: `${themeColors.primaryHex}4D` }}
+                        >
                           ✓
                         </div>
                       )}
@@ -464,7 +472,7 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#4A90D9] hover:bg-[#3b7dc2] text-white text-xs font-medium rounded-xl transition-colors shadow-xs"
+              className={`px-4 py-2 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl transition-colors shadow-xs`}
             >
               保存记录
             </button>

@@ -75,7 +75,11 @@ interface AppContextType {
   checkInTypes: CheckInType[];
   addCheckInType: (t: Omit<CheckInType, 'id' | 'createdAt'>) => CheckInType;
   updateCheckInType: (t: CheckInType) => void;
-  toggleCheckIn: (date: string, type: CheckInType) => void;
+  toggleCheckIn: (
+    date: string,
+    type: CheckInType,
+    mode?: 'overwrite' | 'toggle'
+  ) => { status: 'created' | 'updated' | 'removed'; record: CheckInRecord | null; previousTime?: string };
   checkInRecords: CheckInRecord[];
 
   trends: Trend[];
@@ -488,22 +492,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCheckInTypes(AppStorage.getCheckInTypes());
   };
 
-  const toggleCheckIn = (date: string, type: CheckInType) => {
-    const isCurrentlyChecked = checkInRecords.some(
-      (r) => r.date === date && r.typeId === type.id
-    );
-    AppStorage.toggleCheckIn(date, type);
+  const toggleCheckIn = (
+    date: string,
+    type: CheckInType,
+    mode: 'overwrite' | 'toggle' = 'overwrite'
+  ) => {
+    const result = AppStorage.toggleCheckIn(date, type, mode);
     setCheckInRecords(AppStorage.getCheckInRecords());
 
-    // Trigger short encouragement toast when checked ON
-    if (!isCurrentlyChecked) {
+    if (result.status === 'created') {
       showPraise(getCategoryPraise(type.name));
-      // 【核心功能】：如果完成了当前习惯打卡，系统通知栏提醒立即关闭消失；提前打卡则到点不提醒
       const todayStr = new Date().toISOString().slice(0, 10);
       if (date === todayStr) {
         habitNotificationService.onHabitCompletedToday(type.id);
       }
+    } else if (result.status === 'updated') {
+      const timeMsg = result.record?.checkInTime ? `已更新打卡时间：${result.record.checkInTime}` : '已刷新打卡';
+      const prevMsg = result.previousTime ? `（覆盖上次 ${result.previousTime}）` : '';
+      showPraise(`${timeMsg}${prevMsg}`);
     }
+
+    return result;
   };
 
   // Summary operations

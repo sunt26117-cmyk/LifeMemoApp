@@ -51,6 +51,10 @@ export interface ThemeColors {
   textMain: string;
   textMuted: string;
   textSub: string;
+
+  // Theme primary color hex & focus ring
+  primaryHex: string;
+  focusRing: string;
 }
 
 export function getThemeColors(theme: AppTheme): ThemeColors {
@@ -103,6 +107,9 @@ export function getThemeColors(theme: AppTheme): ThemeColors {
         textMain: 'text-[#3D332A]',
         textMuted: 'text-[#7D6F63]',
         textSub: 'text-[#9E8E81]',
+
+        primaryHex: '#B86B35',
+        focusRing: 'focus:ring-1 focus:ring-[#B86B35] focus:border-[#B86B35]',
       };
 
     case 'forest':
@@ -153,6 +160,9 @@ export function getThemeColors(theme: AppTheme): ThemeColors {
         textMain: 'text-[#243328]',
         textMuted: 'text-[#5E7365]',
         textSub: 'text-[#84998B]',
+
+        primaryHex: '#3B7D57',
+        focusRing: 'focus:ring-1 focus:ring-[#3B7D57] focus:border-[#3B7D57]',
       };
 
     case 'sky':
@@ -202,8 +212,11 @@ export function getThemeColors(theme: AppTheme): ThemeColors {
 
         divider: 'border-[#DDE8F4]',
         textMain: 'text-slate-800',
-        textMuted: 'text-slate-500',
-        textSub: 'text-slate-400',
+        textMuted: 'text-slate-600',
+        textSub: 'text-slate-500',
+
+        primaryHex: '#4A90D9',
+        focusRing: 'focus:ring-1 focus:ring-[#4A90D9] focus:border-[#4A90D9]',
       };
   }
 }

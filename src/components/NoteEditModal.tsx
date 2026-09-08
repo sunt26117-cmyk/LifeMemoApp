@@ -73,7 +73,7 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative">
+      <div className={`bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative border ${themeColors.cardBorder}`}>
         <button
           onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
@@ -93,7 +93,7 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
               placeholder="例如：下周会议备忘 / 突发灵感"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -107,7 +107,7 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
               placeholder="快速记录即时灵感、要点、电话或临时清单..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full text-xs p-2.5 bg-amber-50/40 border border-amber-200/60 rounded-xl focus:outline-none focus:border-amber-400"
+              className={`w-full text-xs p-2.5 bg-amber-50/40 border border-amber-200/60 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -138,9 +138,6 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
             <button
               type="submit"
               className={`px-4 py-2 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl transition-colors shadow-xs`}
-              style={{
-                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
-              }}
             >
               保存便签
             </button>

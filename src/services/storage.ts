@@ -28,6 +28,7 @@ import {
 } from './mockData';
 import { supabaseService } from './supabaseService';
 import { ensureUuid } from '../utils/uuidUtil';
+import { computeStepsTimeline } from '../utils/taskTimeUtil';
 
 export function getPeriodKey(
   type: SummaryType | 'week' | 'month' | 'year',
@@ -295,7 +296,17 @@ export class AppStorage {
   // Tasks
   static getTasks(): Task[] {
     const list = getLocal<Task[]>(STORAGE_KEYS.TASKS, initialTasks);
-    return list.filter((t) => !isTemplateId(t.id));
+    return list
+      .filter((t) => !isTemplateId(t.id))
+      .map((t) => {
+        if (t.steps && t.steps.length > 0) {
+          return {
+            ...t,
+            steps: computeStepsTimeline(t.startTime, t.steps),
+          };
+        }
+        return t;
+      });
   }
   static saveTasks(items: Task[]): void {
     setLocal(STORAGE_KEYS.TASKS, items);
@@ -429,26 +440,70 @@ export class AppStorage {
   static saveCheckInRecords(items: CheckInRecord[]): void {
     setLocal(STORAGE_KEYS.CHECKIN_RECORDS, items);
   }
-  static toggleCheckIn(date: string, type: CheckInType): boolean {
+  static toggleCheckIn(
+    date: string,
+    type: CheckInType,
+    mode: 'overwrite' | 'toggle' = 'overwrite'
+  ): { status: 'created' | 'updated' | 'removed'; record: CheckInRecord | null; previousTime?: string } {
     const items = this.getCheckInRecords();
     const existingIdx = items.findIndex((r) => r.date === date && r.typeId === type.id);
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeStr = `${hh}:${mm}`;
+    const currentIso = now.toISOString();
+
     if (existingIdx >= 0) {
-      // remove
-      const removed = items.splice(existingIdx, 1)[0];
-      this.saveCheckInRecords(items);
-      if (removed) {
-        supabaseService.syncRecord('check_in_records', 'delete', ensureUuid(removed.id));
+      if (mode === 'toggle') {
+        // remove
+        const removed = items.splice(existingIdx, 1)[0];
+        this.saveCheckInRecords(items);
+        if (removed) {
+          supabaseService.syncRecord('check_in_records', 'delete', ensureUuid(removed.id));
+        }
+        return { status: 'removed', record: null };
+      } else {
+        // 重复打卡：覆盖更新最新时间点，并记录历史打卡时间
+        const oldRecord = items[existingIdx];
+        const prevTime = oldRecord.checkInTime || oldRecord.createdAt?.slice(11, 16) || '';
+        const prevList = [...(oldRecord.previousCheckIns || [])];
+        if (prevTime && !prevList.includes(prevTime)) {
+          prevList.push(prevTime);
+        }
+
+        const updatedRecord: CheckInRecord = {
+          ...oldRecord,
+          typeName: type.name,
+          symbol: type.symbol,
+          checkInTime: currentTimeStr,
+          checkedAt: currentIso,
+          previousCheckIns: prevList,
+        };
+
+        items[existingIdx] = updatedRecord;
+        this.saveCheckInRecords(items);
+        supabaseService.syncRecord('check_in_records', 'upsert', updatedRecord.id, {
+          id: updatedRecord.id,
+          date: updatedRecord.date,
+          type_id: ensureUuid(updatedRecord.typeId),
+          symbol_snapshot: updatedRecord.symbol,
+          label_snapshot: updatedRecord.typeName,
+          created_at: updatedRecord.createdAt,
+        });
+        return { status: 'updated', record: updatedRecord, previousTime: prevTime };
       }
-      return false;
     } else {
-      // add
+      // 新增打卡：精确记录当前打卡时间点
       const newRecord: CheckInRecord = {
         id: ensureUuid(),
         date,
         typeId: type.id,
         typeName: type.name,
         symbol: type.symbol,
-        createdAt: new Date().toISOString(),
+        createdAt: currentIso,
+        checkInTime: currentTimeStr,
+        checkedAt: currentIso,
+        previousCheckIns: [],
       };
       items.push(newRecord);
       this.saveCheckInRecords(items);
@@ -460,7 +515,7 @@ export class AppStorage {
         label_snapshot: newRecord.typeName,
         created_at: newRecord.createdAt,
       });
-      return true;
+      return { status: 'created', record: newRecord };
     }
   }
 

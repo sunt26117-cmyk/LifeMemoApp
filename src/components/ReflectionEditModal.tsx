@@ -14,6 +14,7 @@ import { useApp } from '../context/AppContext';
 import { AiService } from '../services/aiService';
 import { buildContextPack } from '../utils/contextRetrieval';
 import { validate } from '../utils/validator';
+import { getThemeColors } from '../utils/themeStyles';
 
 interface ReflectionEditModalProps {
   isOpen: boolean;
@@ -40,7 +41,8 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
   reflection,
   onClose,
 }) => {
-  const { addReflection, updateReflection, memories, photos, tasks, summaries } = useApp();
+  const { addReflection, updateReflection, memories, photos, tasks, summaries, theme } = useApp();
+  const themeColors = getThemeColors(theme);
 
   const [eventDescription, setEventDescription] = useState(reflection?.eventDescription || '');
   const [emotion, setEmotion] = useState<Emotion>((reflection?.emotion as Emotion) || '平静');
@@ -199,7 +201,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className={`bg-white rounded-2xl w-full max-w-2xl shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
         <button
           onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
@@ -208,7 +210,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
         </button>
 
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+          <div className={`w-8 h-8 rounded-xl ${themeColors.subtleBg} ${themeColors.primaryText} flex items-center justify-center`}>
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -233,7 +235,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
               placeholder="客观描述事件经过，例如：与客户进行了两小时项目需求对齐会议..."
               value={eventDescription}
               onChange={(e) => setEventDescription(e.target.value)}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -249,7 +251,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
                   onClick={() => setEmotion(emo)}
                   className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
                     emotion === emo
-                      ? 'bg-[#57B8E3] text-white font-medium shadow-xs'
+                      ? `${themeColors.actionBtn} text-white font-medium shadow-xs`
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -269,7 +271,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
                 placeholder="例如：当场在白板绘制系统拓扑图并记录要点..."
                 value={actionTaken}
                 onChange={(e) => setActionTaken(e.target.value)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
               />
             </div>
 
@@ -282,7 +284,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
                 placeholder="例如：客户认可架构方向，约定周三前提交验收标准草案..."
                 value={result}
                 onChange={(e) => setResult(e.target.value)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
               />
             </div>
           </div>
@@ -473,7 +475,7 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-2 bg-[#57B8E3] hover:bg-[#46a5d0] text-white text-xs font-medium rounded-xl transition-colors shadow-xs"
+              className={`px-4 py-2 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl transition-colors shadow-xs`}
             >
               确认并保存反思
             </button>

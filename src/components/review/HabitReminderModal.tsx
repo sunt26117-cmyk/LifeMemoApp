@@ -5,6 +5,7 @@ import { CheckInType, HabitReminderConfig } from '../../types';
 import { habitNotificationService } from '../../services/habitNotificationService';
 import { useApp } from '../../context/AppContext';
 import { getThemeColors } from '../../utils/themeStyles';
+import { useModalBackHandler } from '../../services/modalBackManager';
 
 interface HabitReminderModalProps {
   isOpen: boolean;
@@ -48,24 +49,27 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
   const [permStatus, setPermStatus] = useState<NotificationPermission>('default');
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  // Bind Android native back button to close HabitReminderModal
+  useModalBackHandler(isOpen, onClose, 'habit_reminder_modal');
+
   useEffect(() => {
     if (isOpen && habit) {
       const rem = habit.reminder;
       if (rem) {
         setEnabled(rem.enabled ?? true);
-        setDaysOfWeek(rem.daysOfWeek && rem.daysOfWeek.length > 0 ? rem.daysOfWeek : [1, 2, 3, 4, 5]);
-        setStartTime(rem.targetStartTime || '21:00');
+        setDaysOfWeek(rem.daysOfWeek && rem.daysOfWeek.length > 0 ? rem.daysOfWeek : [1, 2, 3, 4, 5, 6, 0]);
+        setStartTime(rem.targetStartTime || '20:00');
         setEndTime(rem.targetEndTime || '22:00');
         setAdvanceMinutes(rem.advanceMinutes ?? 10);
       } else {
-        // Defaults: e.g. 21:00 ~ 22:00, advance 10 mins (9点前提醒)
+        // Defaults: 20:00 ~ 22:00, advance 10 mins
         setEnabled(true);
-        setDaysOfWeek([3, 4, 5]); // Default Wed-Fri or all weekdays
-        setStartTime('21:00');
+        setDaysOfWeek([1, 2, 3, 4, 5, 6, 0]); // 默认每天
+        setStartTime('20:00');
         setEndTime('22:00');
         setAdvanceMinutes(10);
       }
-      setPermStatus(habitNotificationService.getPermission());
+      habitNotificationService.getPermissionAsync().then(setPermStatus);
       setTestResult(null);
     }
   }, [isOpen, habit]);
@@ -99,11 +103,10 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
     }
   };
 
-  const selectQuickDays = (type: 'all' | 'work' | 'weekend' | 'wed_fri') => {
+  const selectQuickDays = (type: 'all' | 'work' | 'weekend') => {
     if (type === 'all') setDaysOfWeek([1, 2, 3, 4, 5, 6, 0]);
     if (type === 'work') setDaysOfWeek([1, 2, 3, 4, 5]);
     if (type === 'weekend') setDaysOfWeek([6, 0]);
-    if (type === 'wed_fri') setDaysOfWeek([3, 4, 5]); // 周三到周五
   };
 
   const handleRequestPermission = async () => {
@@ -116,7 +119,7 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
     }
   };
 
-  const handleTestNotification = () => {
+  const handleTestNotification = async () => {
     const tempConfig: HabitReminderConfig = {
       enabled: true,
       daysOfWeek,
@@ -125,12 +128,14 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
       reminderTime: calculatedReminderTime,
       advanceMinutes,
     };
-    const success = habitNotificationService.testNotification({
+    const success = await habitNotificationService.testNotification({
       ...habit,
       reminder: tempConfig,
     });
     if (success) {
-      setTestResult('✅ 测试通知已发送至手机通知栏，请下拉查看！');
+      setTestResult('✅ 测试通知已发送至系统通知栏，请下拉查看！');
+    } else {
+      setTestResult('⚠️ 未能发送通知，请先点击「申请通知权限」允许通知');
     }
   };
 
@@ -232,7 +237,7 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  例如设定「21:00 ~ 22:00」，即每晚9点到10点为该习惯专注打卡时段。
+                  例如设定「20:00 ~ 22:00」，即每晚8点到10点为该习惯专注打卡时段。
                 </p>
               </div>
 
@@ -243,10 +248,10 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
                   <div className="flex gap-1 text-[10px]">
                     <button
                       type="button"
-                      onClick={() => selectQuickDays('wed_fri')}
-                      className="px-1.5 py-0.5 bg-sky-100 text-sky-800 rounded-md hover:bg-sky-200 font-medium"
+                      onClick={() => selectQuickDays('all')}
+                      className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 font-medium"
                     >
-                      周三至五
+                      每天
                     </button>
                     <button
                       type="button"
@@ -257,10 +262,10 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => selectQuickDays('all')}
+                      onClick={() => selectQuickDays('weekend')}
                       className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 font-medium"
                     >
-                      每天
+                      周末
                     </button>
                   </div>
                 </div>

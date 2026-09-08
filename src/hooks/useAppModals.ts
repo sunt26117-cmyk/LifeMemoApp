@@ -10,17 +10,34 @@ import {
   Task,
   TaskCategory,
   TaskStatus,
+  TimeUnit,
 } from '../types';
+
+export interface ConfirmTaskStatusPayload {
+  durationMinutes?: number;
+  durationValue?: number;
+  durationUnit?: TimeUnit;
+  behaviorImprovement?: string[];
+  delayType?: DelayType | null;
+  cancelType?: CancelType | null;
+  reason?: string | null;
+  newStartTime?: string | null;
+  newDueTime?: string | null;
+}
 
 interface UseAppModalsParams {
   changeTaskStatus: (params: {
     taskId: string;
     newStatus: TaskStatus;
     durationMinutes?: number;
+    durationValue?: number;
+    durationUnit?: TimeUnit;
     behaviorImprovement?: string[];
     delayType?: DelayType | null;
     cancelType?: CancelType | null;
     reason?: string | null;
+    newStartTime?: string | null;
+    newDueTime?: string | null;
   }) => void;
   isBiometricLocked: boolean;
 }
@@ -90,13 +107,7 @@ export function useAppModals({ changeTaskStatus, isBiometricLocked }: UseAppModa
     setStatusModalOpen(true);
   };
 
-  const handleConfirmTaskStatus = (params: {
-    durationMinutes?: number;
-    behaviorImprovement?: string[];
-    delayType?: DelayType | null;
-    cancelType?: CancelType | null;
-    reason?: string | null;
-  }) => {
+  const handleConfirmTaskStatus = (params: ConfirmTaskStatusPayload) => {
     if (statusTask && targetStatus) {
       changeTaskStatus({
         taskId: statusTask.id,

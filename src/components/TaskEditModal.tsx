@@ -1,10 +1,11 @@
 // src/components/TaskEditModal.tsx
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
-import { RepeatRule, Task, TaskCategory, TaskPriority, TaskStep } from '../types';
+import { X, Sparkles, Plus, Trash2, CheckCircle2, Circle, Clock, Calendar, AlertTriangle, Info } from 'lucide-react';
+import { RepeatRule, Task, TaskCategory, TaskPriority, TaskStep, TimeUnit } from '../types';
 import { useApp } from '../context/AppContext';
 import { AiService } from '../services/aiService';
 import { getThemeColors } from '../utils/themeStyles';
+import { computeStepsTimeline, durationToMinutes, formatFriendlyDateTime, getStepTimeStatus } from '../utils/taskTimeUtil';
 
 interface TaskEditModalProps {
   isOpen: boolean;
@@ -14,10 +15,14 @@ interface TaskEditModalProps {
   onClose: () => void;
 }
 
-// 遵循用户需求：任务新建中彻底去掉和习惯关联的选项
-const CATEGORIES: TaskCategory[] = ['沟通', '学习', '健康', '项目', '情绪', '规划'];
 const PRIORITIES: TaskPriority[] = ['高', '中', '低'];
 const REPEAT_RULES: RepeatRule[] = ['无', '每天', '每周', '每月', '自定义'];
+const TIME_UNITS: TimeUnit[] = ['天', '周', '月'];
+
+const getLocalISOString = (d: Date = new Date()): string => {
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+};
 
 export const TaskEditModal: React.FC<TaskEditModalProps> = ({
   isOpen,
@@ -35,16 +40,27 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     task?.category || initialCategory || taskCategories[0] || '生活日常'
   );
   const [priority, setPriority] = useState<TaskPriority>(task?.priority || '中');
-  const [dueTime, setDueTime] = useState(task?.dueTime ? task.dueTime.slice(0, 16) : '');
+  const [startTime, setStartTime] = useState<string>('');
+  const [dueTime, setDueTime] = useState<string>('');
   const [repeatRule, setRepeatRule] = useState<RepeatRule>(task?.repeatRule || '无');
-  const [estimatedMinutes, setEstimatedMinutes] = useState<number>(task?.estimatedMinutes || 30);
-  const [steps, setSteps] = useState<TaskStep[]>(task?.steps || []);
+  const [customInterval, setCustomInterval] = useState<number>(1);
+  const [customUnit, setCustomUnit] = useState<'天' | '周' | '月'>('天');
+
+  // 预估时间与单位
+  const [durationValue, setDurationValue] = useState<number>(1);
+  const [durationUnit, setDurationUnit] = useState<TimeUnit>('天');
+
+  // 子任务与新建子任务输入
+  const [steps, setSteps] = useState<TaskStep[]>([]);
   const [newStepText, setNewStepText] = useState('');
+  const [newStepDurationValue, setNewStepDurationValue] = useState<number>(1);
+  const [newStepDurationUnit, setNewStepDurationUnit] = useState<TimeUnit>('天');
+
   const [decomposing, setDecomposing] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState('');
 
-  // Explicitly reset form fields whenever modal opens or task changes
+  // 初始化重置
   useEffect(() => {
     if (isOpen) {
       if (task) {
@@ -52,37 +68,74 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
         setDescription(task.description || '');
         setCategory(task.category || initialCategory || taskCategories[0] || '生活日常');
         setPriority(task.priority || '中');
+        setStartTime(task.startTime ? task.startTime.slice(0, 16) : getLocalISOString());
         setDueTime(task.dueTime ? task.dueTime.slice(0, 16) : '');
         setRepeatRule(task.repeatRule || '无');
-        setEstimatedMinutes(task.estimatedMinutes || 30);
-        setSteps(task.steps ? [...task.steps] : []);
+        if (task.customRepeatDetail) {
+          setCustomInterval(task.customRepeatDetail.interval || 1);
+          setCustomUnit(task.customRepeatDetail.unit || '天');
+        } else {
+          setCustomInterval(1);
+          setCustomUnit('天');
+        }
+
+        // 还原预估时间与单位
+        if (task.estimatedDurationValue != null && task.estimatedDurationValue > 0) {
+          setDurationValue(task.estimatedDurationValue);
+          setDurationUnit(task.estimatedDurationUnit || '天');
+        } else if (task.estimatedMinutes != null && task.estimatedMinutes > 0) {
+          if (task.estimatedMinutes >= 1440 && task.estimatedMinutes % 1440 === 0) {
+            setDurationValue(task.estimatedMinutes / 1440);
+            setDurationUnit('天');
+          } else if (task.estimatedMinutes >= 60 && task.estimatedMinutes % 60 === 0) {
+            setDurationValue(task.estimatedMinutes / 60);
+            setDurationUnit('小时');
+          } else {
+            setDurationValue(task.estimatedMinutes);
+            setDurationUnit('分钟');
+          }
+        } else {
+          setDurationValue(1);
+          setDurationUnit('天');
+        }
+
+        const baseStart = task.startTime ? task.startTime.slice(0, 16) : getLocalISOString();
+        const initialSteps = task.steps ? [...task.steps] : [];
+        setSteps(computeStepsTimeline(baseStart, initialSteps));
       } else {
+        const nowIso = getLocalISOString();
         setTitle(initialTitle || '');
         setDescription('');
         setCategory(initialCategory || taskCategories[0] || '生活日常');
         setPriority('中');
+        setStartTime(nowIso);
         setDueTime('');
         setRepeatRule('无');
-        setEstimatedMinutes(30);
+        setCustomInterval(1);
+        setCustomUnit('天');
+        setDurationValue(1);
+        setDurationUnit('天');
         setSteps([]);
       }
       setNewStepText('');
+      setNewStepDurationValue(1);
+      setNewStepDurationUnit('天');
       setDecomposing(false);
       setIsAddingCategory(false);
       setCustomCategoryInput('');
     }
   }, [isOpen, task, initialTitle, initialCategory, taskCategories]);
 
-  // Synchronize category if list loaded
-  useEffect(() => {
-    if (!category && taskCategories.length > 0) {
-      setCategory(taskCategories[0]);
-    }
-  }, [taskCategories, category]);
+  // 当开始时间变化时，重新重算子任务时间轴与延期判定
+  const handleStartTimeChange = (newStart: string) => {
+    setStartTime(newStart);
+    setSteps((prev) => computeStepsTimeline(newStart, prev));
+  };
 
   const resetAndClose = () => {
     setTitle('');
     setDescription('');
+    setStartTime('');
     setDueTime('');
     setSteps([]);
     setNewStepText('');
@@ -102,30 +155,65 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     setIsAddingCategory(false);
   };
 
+  // 添加单个子任务
   const handleAddStep = () => {
-    if (newStepText.trim()) {
-      setSteps([...steps, { content: newStepText.trim(), done: false }]);
-      setNewStepText('');
-    }
+    if (!newStepText.trim()) return;
+    const safeDuration = Math.max(0.5, Math.round((newStepDurationValue || 1) * 2) / 2);
+    const newStep: TaskStep = {
+      content: newStepText.trim(),
+      done: false,
+      durationValue: safeDuration,
+      durationUnit: newStepDurationUnit,
+    };
+    const updated = [...steps, newStep];
+    setSteps(computeStepsTimeline(startTime, updated));
+    setNewStepText('');
   };
 
+  // 切换完成状态
   const handleToggleStep = (index: number) => {
     const updated = [...steps];
-    updated[index].done = !updated[index].done;
-    setSteps(updated);
+    updated[index] = { ...updated[index], done: !updated[index].done };
+    setSteps(computeStepsTimeline(startTime, updated));
   };
 
+  // 修改单个步骤的时间值或单位（最小以0.5为单位）
+  const handleStepDurationChange = (index: number, val: number, unit: TimeUnit) => {
+    const safeVal = Math.max(0.5, Math.round((val || 0.5) * 2) / 2);
+    const updated = [...steps];
+    updated[index] = {
+      ...updated[index],
+      durationValue: safeVal,
+      durationUnit: unit,
+    };
+    setSteps(computeStepsTimeline(startTime, updated));
+  };
+
+  // 删除步骤
   const handleDeleteStep = (index: number) => {
-    setSteps(steps.filter((_, i) => i !== index));
+    const updated = steps.filter((_, i) => i !== index);
+    setSteps(computeStepsTimeline(startTime, updated));
   };
 
+  // AI 智能拆解步骤（根据总预估时间自动分配各步骤时长，重新生成时彻底覆盖原步骤，绝不累加翻倍）
   const handleAiDecompose = async () => {
     if (!title.trim()) return;
     setDecomposing(true);
     try {
-      const generatedSteps = await AiService.decomposeTask(title, description);
-      const mappedSteps: TaskStep[] = generatedSteps.map((s) => ({ content: s, done: false }));
-      setSteps([...steps, ...mappedSteps]);
+      const generated = await AiService.decomposeTaskWithDurations(title, description, {
+        value: durationValue,
+        unit: durationUnit,
+      });
+
+      const mappedSteps: TaskStep[] = generated.map((g) => ({
+        content: g.content,
+        done: false,
+        durationValue: Math.max(0.5, Math.round((g.durationValue || 0.5) * 2) / 2),
+        durationUnit: g.durationUnit,
+      }));
+
+      // 覆盖原有步骤，避免重复生成时时间翻倍
+      setSteps(computeStepsTimeline(startTime, mappedSteps));
     } finally {
       setDecomposing(false);
     }
@@ -135,29 +223,40 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     e.preventDefault();
     if (!title.trim()) return;
 
+    // 提交前最终基于当前开始时间重算一次时间轴与延期状态
+    const finalSteps = computeStepsTimeline(startTime, steps);
+    const estimatedMins = durationToMinutes(durationValue, durationUnit);
+
+    const taskPayload = {
+      title: title.trim(),
+      description: description.trim(),
+      category,
+      priority,
+      startTime: startTime ? new Date(startTime).toISOString() : null,
+      dueTime: dueTime ? new Date(dueTime).toISOString() : null,
+      repeatRule,
+      customRepeatDetail:
+        repeatRule === '自定义'
+          ? {
+              interval: customInterval || 1,
+              unit: customUnit || '天',
+            }
+          : null,
+      estimatedMinutes: estimatedMins,
+      estimatedDurationValue: durationValue,
+      estimatedDurationUnit: durationUnit,
+      steps: finalSteps,
+    };
+
     if (task) {
       updateTask({
         ...task,
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        priority,
-        dueTime: dueTime ? new Date(dueTime).toISOString() : null,
-        repeatRule,
-        estimatedMinutes,
-        steps,
+        ...taskPayload,
       });
     } else {
       addTask({
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        priority,
+        ...taskPayload,
         status: '未开始',
-        dueTime: dueTime ? new Date(dueTime).toISOString() : null,
-        repeatRule,
-        estimatedMinutes,
-        steps,
       });
     }
     resetAndClose();
@@ -165,7 +264,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={resetAndClose}
           className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
@@ -173,11 +272,12 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
           <X className="w-4 h-4" />
         </button>
 
-        <h3 className="text-base font-semibold text-slate-800 mb-4">
+        <h3 className="text-base font-semibold text-slate-800 mb-3">
           {task ? '编辑待办任务' : '新建待办任务'}
         </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {/* 任务标题 */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               任务标题 <span className="text-rose-500">*</span>
@@ -188,23 +288,23 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
               placeholder="例如：整理项目上线架构图与验收清单"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
+          {/* 详细说明 */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              详细说明
-            </label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">详细说明</label>
             <textarea
               rows={2}
               placeholder="补充任务背景、注意事项或交付指标..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
+          {/* 所属分类 & 优先级 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -213,7 +313,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsAddingCategory(true)}
-                    className="text-[10px] text-[#4A90D9] hover:underline"
+                    className={`text-[10px] ${themeColors.primaryText} hover:underline font-medium`}
                   >
                     + 自定义
                   </button>
@@ -234,12 +334,12 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                         handleCreateCustomCategory();
                       }
                     }}
-                    className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                    className={`w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
                   />
                   <button
                     type="button"
                     onClick={handleCreateCustomCategory}
-                    className="px-2 py-2 bg-[#57B8E3] text-white text-[11px] rounded-xl shrink-0"
+                    className={`px-2.5 py-2 ${themeColors.actionBtn} text-white text-[11px] rounded-xl shrink-0 font-medium`}
                   >
                     添加
                   </button>
@@ -255,7 +355,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as TaskCategory)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-sky-500"
+                  className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
                 >
                   {Array.from(new Set([...taskCategories, category].filter(Boolean)))
                     .filter((c) => c !== '习惯' && c !== '习惯打卡')
@@ -273,7 +373,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
@@ -284,117 +384,305 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             </div>
           </div>
 
+          {/* 开始时间 & 截止时间 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">截止时间</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-600">
+                  <Clock className={`w-3 h-3 ${themeColors.primaryText}`} />
+                  开始时间
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleStartTimeChange(getLocalISOString())}
+                  className={`text-[10px] ${themeColors.primaryText} hover:underline font-medium`}
+                >
+                  设为现在
+                </button>
+              </div>
+              <input
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                className={`w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing} font-mono`}
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1 text-xs font-semibold text-slate-600 mb-1">
+                <Calendar className="w-3 h-3 text-slate-500" />
+                截止时间（可选）
+              </label>
               <input
                 type="datetime-local"
                 value={dueTime}
                 onChange={(e) => setDueTime(e.target.value)}
-                className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
+                className={`w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing} font-mono`}
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">重复规则</label>
-              <select
-                value={repeatRule}
-                onChange={(e) => setRepeatRule(e.target.value as RepeatRule)}
-                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
-              >
-                {REPEAT_RULES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+          {/* 重复规则 & 自定义展开 */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">重复规则</label>
+                <select
+                  value={repeatRule}
+                  onChange={(e) => setRepeatRule(e.target.value as RepeatRule)}
+                  className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
+                >
+                  {REPEAT_RULES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 预估时间与单位（最小 0.5 为单位，去除小时和分钟） */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  总预估时间 (最小0.5天)
+                </label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={0.5}
+                    step={0.5}
+                    value={durationValue}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setDurationValue(!isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5);
+                    }}
+                    className={`flex-1 text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing} font-mono font-medium`}
+                  />
+                  <select
+                    value={durationUnit}
+                    onChange={(e) => {
+                      const u = e.target.value as TimeUnit;
+                      setDurationUnit(u);
+                      setNewStepDurationUnit(u);
+                    }}
+                    className={`w-20 text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
+                  >
+                    {TIME_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
+
+            {/* 当选择「自定义」重复规则时的直观操作面板 */}
+            {repeatRule === '自定义' && (
+              <div className={`p-3 ${themeColors.subtleBg} border ${themeColors.subtleBorder} rounded-xl text-xs space-y-1.5 animate-fadeIn`}>
+                <div className={`flex items-center gap-1 ${themeColors.primaryText} font-semibold`}>
+                  <Info className="w-3.5 h-3.5" />
+                  <span>自定义重复周期设置</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600">每隔</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={customInterval}
+                    onChange={(e) => setCustomInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                    className={`w-16 p-1.5 text-center bg-white border ${themeColors.subtleBorder} rounded-lg text-xs font-mono font-medium focus:outline-none ${themeColors.focusRing}`}
+                  />
+                  <select
+                    value={customUnit}
+                    onChange={(e) => setCustomUnit(e.target.value as '天' | '周' | '月')}
+                    className={`p-1.5 bg-white border ${themeColors.subtleBorder} rounded-lg text-xs focus:outline-none ${themeColors.focusRing}`}
+                  >
+                    <option value="天">天</option>
+                    <option value="周">周</option>
+                    <option value="月">月</option>
+                  </select>
+                  <span className="text-slate-600">循环一次</span>
+                </div>
+                <p className={`text-[11px] ${themeColors.textMuted}`}>
+                  当前设定：每 {customInterval} {customUnit}重复一次。任务完成后将按此周期自动滚入下一周期。
+                </p>
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              预估用时（分钟）
-            </label>
-            <input
-              type="number"
-              min={5}
-              step={5}
-              value={estimatedMinutes}
-              onChange={(e) => setEstimatedMinutes(parseInt(e.target.value) || 30)}
-              className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#57B8E3]"
-            />
-          </div>
-
-          {/* Sub-steps & AI Breakdown */}
+          {/* 子任务步骤 & 时间显示 & AI 智能拆解 */}
           <div className="pt-2 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-700">执行子步骤</label>
+              <div>
+                <label className="text-xs font-semibold text-slate-700">执行子任务步骤</label>
+                <span className="ml-1.5 text-[10px] text-slate-400">（以开始时间为基准推算截止）</span>
+              </div>
               <button
                 type="button"
                 onClick={handleAiDecompose}
                 disabled={decomposing || !title.trim()}
-                className="flex items-center gap-1 text-[11px] px-2.5 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="flex items-center gap-1 text-[11px] px-2.5 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-2xs"
               >
                 <Sparkles className="w-3 h-3" />
-                <span>{decomposing ? '拆解中...' : 'AI 拆解步骤'}</span>
+                <span>{decomposing ? '智能分配中...' : 'AI 拆解分配时间'}</span>
               </button>
             </div>
 
-            <div className="space-y-1.5 mb-2.5">
-              {steps.map((step, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs"
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleToggleStep(idx)}
-                    className="flex items-center gap-2 text-left flex-1"
+            {/* 子步骤列表 */}
+            <div className="space-y-2 mb-3">
+              {steps.map((step, idx) => {
+                const timeStatus = getStepTimeStatus(step);
+                return (
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-xl border transition-all text-xs ${
+                      step.isDelayed
+                        ? 'bg-rose-50/50 border-rose-200'
+                        : step.done
+                        ? 'bg-slate-50/80 border-slate-200 opacity-75'
+                        : 'bg-white border-slate-200 shadow-2xs'
+                    }`}
                   >
-                    {step.done ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-slate-400 shrink-0" />
-                    )}
-                    <span className={step.done ? 'line-through text-slate-400' : 'text-slate-700'}>
-                      {step.content}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteStep(idx)}
-                    className="p-1 text-slate-400 hover:text-rose-500 ml-2"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-start justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStep(idx)}
+                        className="flex items-start gap-2 text-left flex-1 min-w-0 mt-0.5"
+                      >
+                        {step.done ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                        )}
+                        <span
+                          className={`flex-1 break-words font-medium ${
+                            step.done ? 'line-through text-slate-400' : 'text-slate-700'
+                          }`}
+                        >
+                          <span className="text-[10px] text-slate-400 mr-1 font-mono">#{idx + 1}</span>
+                          {step.content}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStep(idx)}
+                        className="p-1 text-slate-300 hover:text-rose-500 shrink-0 rounded-md transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* 步骤时间配置 & 截止/延期状态展示 */}
+                    <div className="mt-2 pt-1.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400 text-[10px]">预估耗时:</span>
+                        <input
+                          type="number"
+                          min={0.5}
+                          step={0.5}
+                          value={step.durationValue ?? 1}
+                          onChange={(e) =>
+                            handleStepDurationChange(
+                              idx,
+                              parseFloat(e.target.value) || 0.5,
+                              step.durationUnit || durationUnit
+                            )
+                          }
+                          className="w-14 p-1 text-center bg-slate-50 border border-slate-200 rounded-md text-[10px] font-mono font-medium"
+                        />
+                        <select
+                          value={step.durationUnit || durationUnit}
+                          onChange={(e) =>
+                            handleStepDurationChange(
+                              idx,
+                              step.durationValue ?? 1,
+                              e.target.value as TimeUnit
+                            )
+                          }
+                          className="p-1 bg-slate-50 border border-slate-200 rounded-md text-[10px]"
+                        >
+                          {TIME_UNITS.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {step.estimatedDueTime && (
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            截止: {formatFriendlyDateTime(step.estimatedDueTime).slice(5)}
+                          </span>
+                        )}
+
+                        {timeStatus.text && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium flex items-center gap-0.5 ${timeStatus.colorClass}`}
+                          >
+                            {step.isDelayed && <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />}
+                            {timeStatus.text}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="flex gap-2">
+            {/* 手动添加子任务输入条 */}
+            <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-200">
               <input
                 type="text"
-                placeholder="添加单个执行步骤..."
+                placeholder="手动添加单个子任务步骤..."
                 value={newStepText}
                 onChange={(e) => setNewStepText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddStep())}
-                className="flex-1 text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#57B8E3]"
+                className={`flex-1 min-w-[140px] text-xs py-1.5 px-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none ${themeColors.focusRing}`}
               />
-              <button
-                type="button"
-                onClick={handleAddStep}
-                className="flex items-center gap-1 text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>添加</span>
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <input
+                  type="number"
+                  min={0.5}
+                  step={0.5}
+                  value={newStepDurationValue}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setNewStepDurationValue(!isNaN(val) && val >= 0.5 ? Math.round(val * 2) / 2 : 0.5);
+                  }}
+                  className="w-14 py-1.5 text-center text-xs bg-white border border-slate-200 rounded-lg font-mono font-medium"
+                />
+                <select
+                  value={newStepDurationUnit}
+                  onChange={(e) => setNewStepDurationUnit(e.target.value as TimeUnit)}
+                  className="py-1.5 px-1 text-xs bg-white border border-slate-200 rounded-lg"
+                >
+                  {TIME_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddStep}
+                  className={`flex items-center gap-1 text-xs px-2.5 py-1.5 ${themeColors.actionBtn} text-white rounded-lg transition-colors shrink-0 font-medium`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>添加</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-2 pt-2 border-t border-slate-100">
+          {/* 底部按钮 */}
+          <div className="mt-5 flex justify-end gap-2 pt-3 border-t border-slate-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={resetAndClose}
               className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
             >
               取消
@@ -402,11 +690,8 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
             <button
               type="submit"
               className={`px-4 py-2 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl transition-colors shadow-xs`}
-              style={{
-                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
-              }}
             >
-              {task ? '保存修改' : '创建任务'}
+              {task ? '保存修改并更新时间轴' : '创建任务并启动时间轴'}
             </button>
           </div>
         </form>
@@ -414,3 +699,4 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
     </div>
   );
 };
+

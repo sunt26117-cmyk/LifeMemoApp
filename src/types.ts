@@ -120,11 +120,21 @@ export interface CheckInRecord {
   typeName: string;
   symbol: string;
   createdAt: string;
+  checkInTime?: string; // 精确到分钟的本地时间如 "09:25"
+  checkedAt?: string; // 精确到分钟的ISO时间戳字符串
+  previousCheckIns?: string[]; // 之前打卡的时间历史，以备将来追溯分析使用
 }
 
+export type TimeUnit = '天' | '周' | '月' | '小时' | '分钟';
+
 export interface TaskStep {
+  id?: string;
   content: string;
   done: boolean;
+  durationValue?: number;
+  durationUnit?: TimeUnit;
+  estimatedDueTime?: string | null;
+  isDelayed?: boolean;
 }
 
 export interface TaskFeedback {
@@ -146,7 +156,13 @@ export interface Task {
   dueTime?: string | null;
   reminderTime?: string | null;
   repeatRule: RepeatRule;
+  customRepeatDetail?: {
+    interval: number;
+    unit: '天' | '周' | '月';
+  } | null;
   estimatedMinutes?: number | null;
+  estimatedDurationValue?: number | null;
+  estimatedDurationUnit?: TimeUnit;
   status: TaskStatus;
   steps: TaskStep[];
   sourceReflectionId?: string | null;

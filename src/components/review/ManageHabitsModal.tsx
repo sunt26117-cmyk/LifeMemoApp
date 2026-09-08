@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { CheckInType } from '../../types';
 import { HabitReminderModal } from './HabitReminderModal';
 import { getThemeColors } from '../../utils/themeStyles';
+import { useModalBackHandler } from '../../services/modalBackManager';
 
 interface ManageHabitsModalProps {
   isOpen: boolean;
@@ -18,6 +19,9 @@ export const ManageHabitsModal: React.FC<ManageHabitsModalProps> = ({ isOpen, on
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeSymbol, setNewTypeSymbol] = useState('⭐');
   const [reminderTargetHabit, setReminderTargetHabit] = useState<CheckInType | null>(null);
+
+  // Bind Android native back button to close ManageHabitsModal
+  useModalBackHandler(isOpen, onClose, 'manage_habits_modal');
 
   if (!isOpen) return null;
 
@@ -66,7 +70,7 @@ export const ManageHabitsModal: React.FC<ManageHabitsModalProps> = ({ isOpen, on
           </div>
 
           <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-            可为每个习惯设定<strong className="text-slate-700">固定时间段（如21点~22点）</strong>与<strong className="text-slate-700">手机通知栏提醒</strong>。完成打卡后通知自动消失；提前完成到点不打扰。
+            可为每个习惯设定<strong className="text-slate-700">固定时间段</strong>与<strong className="text-slate-700">手机通知栏提醒</strong>。完成打卡后通知自动消失；提前完成到点不打扰。
           </p>
 
           <div className="space-y-2 max-h-64 overflow-y-auto mb-4 pr-1">

@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Flame,
   Lock,
+  AlertTriangle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getLunarDisplay } from '../utils/lunarUtil';
@@ -200,29 +201,57 @@ export const TodayView: React.FC<TodayViewProps> = ({
           {checkInTypes
             .filter((t) => t.enabled)
             .map((type) => {
-              const isChecked = todayCheckIns.some((r) => r.typeId === type.id);
+              const checkRecord = todayCheckIns.find((r) => r.typeId === type.id);
+              const isChecked = !!checkRecord;
               const hasReminder = type.reminder?.enabled;
               const timeDisplay = type.reminder?.targetStartTime || type.reminder?.reminderTime;
+              const checkedTimeStr =
+                checkRecord?.checkInTime ||
+                (checkRecord?.createdAt ? new Date(checkRecord.createdAt).toTimeString().slice(0, 5) : '');
+
               return (
-                <button
-                  key={type.id}
-                  onClick={() => toggleCheckIn(todayStr, type)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-all border ${
-                    isChecked
-                      ? 'bg-emerald-100/70 border-emerald-300 text-emerald-800 shadow-xs scale-98'
-                      : `${themeColors.subtleBg} ${themeColors.subtleBorder} ${themeColors.textMain} ${themeColors.subtleHoverBg}`
-                  }`}
-                  title={hasReminder ? `计划时段: ${timeDisplay}，已开启智能通知` : undefined}
-                >
-                  <span className="text-sm">{type.symbol}</span>
-                  <span>{type.name}</span>
-                  {hasReminder && (
-                    <span className="text-[10px] text-slate-400 font-mono font-normal">
-                      {timeDisplay}
-                    </span>
+                <div key={type.id} className="relative group shrink-0">
+                  <button
+                    onClick={() => toggleCheckIn(todayStr, type, 'overwrite')}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border ${
+                      isChecked
+                        ? 'bg-emerald-100/80 border-emerald-300 text-emerald-900 shadow-xs'
+                        : `${themeColors.subtleBg} ${themeColors.subtleBorder} ${themeColors.textMain} ${themeColors.subtleHoverBg}`
+                    }`}
+                    title={
+                      isChecked
+                        ? `已于 ${checkedTimeStr} 打卡。再次点击可覆盖更新为当前时间；点击右上角 × 可撤销`
+                        : hasReminder
+                        ? `计划时段: ${timeDisplay}`
+                        : '点击打卡'
+                    }
+                  >
+                    <span className="text-sm">{type.symbol}</span>
+                    <span>{type.name}</span>
+                    {isChecked ? (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono bg-emerald-200/80 text-emerald-900 px-1.5 py-0.5 rounded-md font-semibold ml-0.5">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                        {checkedTimeStr}
+                      </span>
+                    ) : hasReminder ? (
+                      <span className="text-[10px] text-slate-400 font-mono font-normal">
+                        {timeDisplay}
+                      </span>
+                    ) : null}
+                  </button>
+                  {isChecked && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCheckIn(todayStr, type, 'toggle');
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-slate-400/80 hover:bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[11px] leading-none shadow-xs"
+                      title="撤销打卡"
+                    >
+                      ×
+                    </button>
                   )}
-                  {isChecked && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 ml-0.5" />}
-                </button>
+                </div>
               );
             })}
         </div>
@@ -312,15 +341,25 @@ export const TodayView: React.FC<TodayViewProps> = ({
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => onOpenTaskEdit(task)}
                   >
-                    <p className={`text-xs font-medium ${themeColors.textMain} truncate`}>{task.title}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-xs font-medium ${themeColors.textMain} truncate`}>{task.title}</p>
+                      {task.steps?.some((s) => !s.done && s.isDelayed) && (
+                        <span className="text-[9px] px-1 py-0.2 bg-rose-100 text-rose-700 rounded font-medium flex items-center gap-0.5 shrink-0">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          步骤延期
+                        </span>
+                      )}
+                    </div>
                     <div className={`flex items-center gap-2 mt-1 text-[11px] ${themeColors.textMuted}`}>
                       <span className={`px-1.5 py-0.2 ${themeColors.cardBg} border ${themeColors.subtleBorder} rounded text-[10px]`}>
                         {task.category}
                       </span>
-                      {task.estimatedMinutes && (
+                      {(task.estimatedDurationValue || task.estimatedMinutes) && (
                         <span className="flex items-center gap-0.5">
                           <Clock className="w-3 h-3" />
-                          {task.estimatedMinutes}分
+                          {task.estimatedDurationValue != null && task.estimatedDurationUnit
+                            ? `${task.estimatedDurationValue}${task.estimatedDurationUnit}`
+                            : `${task.estimatedMinutes}分`}
                         </span>
                       )}
                       {task.steps.length > 0 && (
