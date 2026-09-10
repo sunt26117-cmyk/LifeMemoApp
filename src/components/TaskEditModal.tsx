@@ -281,22 +281,22 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className={`${themeColors.cardBg} border ${themeColors.cardBorder} rounded-2xl w-full max-w-lg shadow-xl p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto`}>
         <button
           onClick={resetAndClose}
-          className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+          className={`absolute top-4 right-4 p-1 ${themeColors.textSub} hover:${themeColors.textMain} rounded-full`}
         >
           <X className="w-4 h-4" />
         </button>
 
-        <h3 className="text-base font-semibold text-slate-800 mb-3">
+        <h3 className={`text-base font-semibold ${themeColors.textMain} mb-3`}>
           {task ? '编辑待办任务' : '新建待办任务'}
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           {/* 任务标题 */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
+            <label className={`block text-xs font-semibold ${themeColors.textMain} mb-1`}>
               任务标题 <span className="text-rose-500">*</span>
             </label>
             <input
@@ -305,19 +305,19 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
               placeholder="例如：整理项目上线架构图与验收清单"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
+              className={`w-full text-xs p-2.5 ${themeColors.subtleBg} border ${themeColors.subtleBorder} ${themeColors.textMain} rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
           {/* 详细说明 */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">详细说明</label>
+            <label className={`block text-xs font-semibold ${themeColors.textMain} mb-1`}>详细说明</label>
             <textarea
               rows={2}
               placeholder="补充任务背景、注意事项或交付指标..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
+              className={`w-full text-xs p-2.5 ${themeColors.subtleBg} border ${themeColors.subtleBorder} ${themeColors.textMain} rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 
@@ -721,11 +721,11 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({
           </div>
 
           {/* 底部按钮 */}
-          <div className="mt-5 flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className={`mt-5 flex justify-end gap-2 pt-3 border-t ${themeColors.divider}`}>
             <button
               type="button"
               onClick={resetAndClose}
-              className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              className={`px-4 py-2 text-xs ${themeColors.textSub} hover:${themeColors.textMain} ${themeColors.subtleHoverBg} rounded-xl transition-colors`}
             >
               取消
             </button>

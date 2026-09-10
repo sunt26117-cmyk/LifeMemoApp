@@ -18,6 +18,7 @@ import { useApp } from '../context/AppContext';
 import { getLunarDisplay } from '../utils/lunarUtil';
 import { Task, TaskStatus } from '../types';
 import { getThemeColors } from '../utils/themeStyles';
+import { formatLocalDate } from '../utils/dateUtil';
 import { ManageHabitsModal } from './review/ManageHabitsModal';
 import { CollapsibleCheckInList } from './checkin/CollapsibleCheckInList';
 
@@ -58,7 +59,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
   const themeColors = getThemeColors(theme);
 
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = formatLocalDate(today);
   const lunarInfo = getLunarDisplay(today);
 
   const WEEK_DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -90,82 +91,91 @@ export const TodayView: React.FC<TodayViewProps> = ({
   // Gradient for the top hero banner depending on theme
   const bannerGradient =
     theme === 'warm'
-      ? 'from-[#C4753D] via-[#D8894E] to-[#E5AC77]'
+      ? 'from-[#A85822] via-[#B86B35] to-[#D48950]'
       : theme === 'forest'
-      ? 'from-[#35724F] via-[#488B63] to-[#67AC83]'
-      : 'from-sky-500 via-[#57B8E3] to-[#7ED9B7]';
+      ? 'from-[#27583B] via-[#35724F] to-[#4F9468]'
+      : 'from-[#2B6CB0] via-[#3B82F6] to-[#48B8A6]';
 
   return (
-    <div className="space-y-4 pb-20">
-      {/* Date & Greeting Card */}
-      <div className={`bg-gradient-to-r ${bannerGradient} rounded-3xl p-5 text-white shadow-sm relative overflow-hidden`}>
-        <div className="relative z-10">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium tracking-wide bg-white/20 px-2.5 py-0.5 rounded-full backdrop-blur-xs">
-              {weekDayStr} · 农历 {lunarInfo.text}
-            </span>
-            <div className="flex items-center gap-1 text-xs bg-amber-400/30 px-2 py-0.5 rounded-full">
-              <Flame className="w-3.5 h-3.5 text-amber-200 fill-amber-200" />
-              <span>今日打卡 {todayCheckIns.length} 项</span>
+    <div className="space-y-3.5 pb-20">
+      {/* Date & Greeting Card - Clean 3-Tier Structured Layout (Compressed Height) */}
+      <div className={`bg-gradient-to-br ${bannerGradient} rounded-2xl sm:rounded-3xl p-3 sm:p-3.5 text-white shadow-sm relative overflow-hidden`}>
+        <div className="relative z-10 space-y-2 sm:space-y-2.5">
+          {/* Tier 1: Date & Lunar (Left) + Prominent Year Milestone (Right) */}
+          <div className="flex items-center justify-between gap-2 pb-1.5 sm:pb-2 border-b border-white/15">
+            {/* Left: Date + Lunar info */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+              <span className="text-base sm:text-lg font-bold tracking-tight shrink-0">
+                {today.getMonth() + 1}月{today.getDate()}日 {weekDayStr}
+              </span>
+              <span className="text-[10px] sm:text-[11px] text-white/85 bg-white/15 px-2 py-0.5 rounded-full font-medium backdrop-blur-xs shrink-0">
+                农历 {lunarInfo.text}
+              </span>
+            </div>
+
+            {/* Right: Year Milestone with Enlarged Bold Font */}
+            <div className="flex items-baseline gap-1 bg-white/15 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-xl sm:rounded-2xl border border-white/20 backdrop-blur-xs shrink-0 shadow-2xs">
+              <span className="text-[11px] text-white/85 font-medium">今年已过</span>
+              <span className="text-xl sm:text-2xl font-black font-mono text-amber-200 drop-shadow-xs leading-none">
+                {daysPassed}
+              </span>
+              <span className="text-[11px] text-white/90 font-medium">天</span>
             </div>
           </div>
 
-          <div className="flex items-start justify-between gap-3 mt-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold">
-                {today.getMonth() + 1}月{today.getDate()}日，保持节奏
-              </h2>
-              <p className="text-xs text-white/90 mt-1 max-w-[210px] sm:max-w-xs leading-relaxed">
-                小事记录，日常笃行。将行动沉淀为不可逆的行为成长证据。
-              </p>
-            </div>
-
-            {/* 年度时光流逝展示：用较大的数字字体显示今年已经过去了多少天 */}
-            <div className="shrink-0 bg-white/15 backdrop-blur-xs border border-white/25 rounded-2xl px-3.5 py-2 text-center shadow-xs flex flex-col items-center justify-center min-w-[86px]">
-              <span className="text-[10px] text-white/80 font-medium tracking-wide">今年已过</span>
-              <div className="flex items-baseline justify-center gap-0.5 my-0.5">
-                <span className="text-3xl sm:text-4xl font-black tracking-tight font-mono leading-none drop-shadow-xs">
-                  {daysPassed}
-                </span>
-                <span className="text-xs text-white/90 font-medium">天</span>
-              </div>
-              <div className="text-[10px] text-white/75 flex items-center justify-center gap-1">
-                <span>{yearProgressPercent}%</span>
-                <span>·</span>
-                <span>余{remainingDays}天</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 年度时光流逝进度条 */}
-          <div className="mt-3 pt-2.5 border-t border-white/15">
-            <div className="flex items-center justify-between text-[10px] text-white/80 mb-1">
-              <span>{today.getFullYear()} 年度进程</span>
-              <span>第 {daysPassed} / {totalDaysInYear} 天 ({yearProgressPercent}%)</span>
+          {/* Tier 2: Motto & Year Progress Bar (Full display with no font clipping) */}
+          <div className="pt-0.5">
+            <div className="flex items-center justify-between gap-2 text-[11px] text-white/95 leading-normal mb-1">
+              <span className="font-medium tracking-wide truncate">
+                保持节奏 · 小事记录，日常笃行
+              </span>
+              <span className="font-mono text-white/85 text-[10px] sm:text-[11px] shrink-0">
+                余 {remainingDays} 天 · {yearProgressPercent}%
+              </span>
             </div>
             <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-white/90 h-full rounded-full transition-all duration-500 shadow-xs"
+                className="bg-white/95 h-full rounded-full transition-all duration-500 shadow-xs"
                 style={{ width: `${yearProgressPercent}%` }}
               />
             </div>
           </div>
 
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-white/15 text-center">
-            <div>
-              <span className="text-[11px] text-white/80 block">待办进度</span>
-              <span className="text-base font-bold">
-                {completedTodayTasks.length}/{todayTasks.length + completedTodayTasks.length}
-              </span>
+          {/* Tier 3: 3 Structured Color-Coded Metric Cards in a Clean 3-Column Grid */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-0.5">
+            {/* 待办 Card */}
+            <div className={`${themeColors.metricTasksBg} ${themeColors.metricTasksBorder} border rounded-xl py-1.5 px-2 text-center backdrop-blur-2xs shadow-2xs transition-all`}>
+              <span className={`text-[10.5px] sm:text-[11px] ${themeColors.metricTasksText} font-medium block leading-tight`}>今日待办</span>
+              <div className="flex items-baseline justify-center gap-0.5 mt-0.5">
+                <span className="text-base sm:text-lg font-bold font-mono leading-none text-white">
+                  {completedTodayTasks.length}
+                </span>
+                <span className="text-[10px] sm:text-[11px] text-white/70 font-mono leading-none">
+                  /{todayTasks.length + completedTodayTasks.length}
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] text-white/80 block">习惯打卡</span>
-              <span className="text-base font-bold">{todayCheckIns.length} 项</span>
+
+            {/* 打卡 Card */}
+            <div className={`${themeColors.metricHabitsBg} ${themeColors.metricHabitsBorder} border rounded-xl py-1.5 px-2 text-center backdrop-blur-2xs shadow-2xs transition-all`}>
+              <span className={`text-[10.5px] sm:text-[11px] ${themeColors.metricHabitsText} font-medium block leading-tight`}>习惯打卡</span>
+              <div className="flex items-baseline justify-center gap-0.5 mt-0.5">
+                <span className="text-base sm:text-lg font-bold font-mono leading-none text-white">
+                  {todayCheckIns.length}
+                </span>
+                <span className="text-[10px] sm:text-[11px] text-white/70 leading-none">项</span>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] text-white/80 block">深度反思</span>
-              <span className="text-base font-bold">{reflections.length} 篇</span>
+
+            {/* 反思 Card */}
+            <div className={`${themeColors.metricReflectionsBg} ${themeColors.metricReflectionsBorder} border rounded-xl py-1.5 px-2 text-center backdrop-blur-2xs shadow-2xs transition-all`}>
+              <span className={`text-[10.5px] sm:text-[11px] ${themeColors.metricReflectionsText} font-medium block leading-tight`}>深度反思</span>
+              <div className="flex items-baseline justify-center gap-0.5 mt-0.5">
+                <span className="text-base sm:text-lg font-bold font-mono leading-none text-white">
+                  {reflections.length}
+                </span>
+                <span className="text-[10px] sm:text-[11px] text-white/70 leading-none">篇</span>
+              </div>
             </div>
           </div>
         </div>
@@ -178,7 +188,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
       <div className="grid grid-cols-4 gap-2">
         <button
           onClick={onOpenMemoryCreate}
-          className={`flex flex-col items-center justify-center p-3 ${themeColors.cardBg} hover:opacity-90 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group`}
+          className={`flex flex-col items-center justify-center p-2.5 sm:p-3 ${themeColors.cardBg} hover:opacity-90 active:scale-95 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group cursor-pointer`}
         >
           <div className={`w-9 h-9 rounded-xl ${themeColors.subtleBg} ${themeColors.primaryText} flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform`}>
             <BookOpen className="w-4 h-4" />
@@ -188,7 +198,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
 
         <button
           onClick={onOpenNoteCreate}
-          className={`flex flex-col items-center justify-center p-3 ${themeColors.cardBg} hover:opacity-90 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group`}
+          className={`flex flex-col items-center justify-center p-2.5 sm:p-3 ${themeColors.cardBg} hover:opacity-90 active:scale-95 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group cursor-pointer`}
         >
           <div className="w-9 h-9 rounded-xl bg-amber-100/70 text-amber-700 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
             <StickyNote className="w-4 h-4" />
@@ -198,7 +208,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
 
         <button
           onClick={() => onOpenTaskCreate()}
-          className={`flex flex-col items-center justify-center p-3 ${themeColors.cardBg} hover:opacity-90 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group`}
+          className={`flex flex-col items-center justify-center p-2.5 sm:p-3 ${themeColors.cardBg} hover:opacity-90 active:scale-95 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group cursor-pointer`}
         >
           <div className="w-9 h-9 rounded-xl bg-emerald-100/70 text-emerald-700 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
             <CheckSquare className="w-4 h-4" />
@@ -208,7 +218,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
 
         <button
           onClick={onOpenReflectionCreate}
-          className={`flex flex-col items-center justify-center p-3 ${themeColors.cardBg} hover:opacity-90 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group`}
+          className={`flex flex-col items-center justify-center p-2.5 sm:p-3 ${themeColors.cardBg} hover:opacity-90 active:scale-95 rounded-2xl border ${themeColors.cardBorder} shadow-xs transition-all text-center group cursor-pointer`}
         >
           <div className="w-9 h-9 rounded-xl bg-purple-100/70 text-purple-700 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
             <Sparkles className="w-4 h-4" />
@@ -258,8 +268,13 @@ export const TodayView: React.FC<TodayViewProps> = ({
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => onOpenTaskEdit(task)}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <p className={`text-xs font-medium ${themeColors.textMain} truncate`}>{task.title}</p>
+                      {task.priority === '高' && (
+                        <span className="text-[9px] px-1.5 py-0.2 bg-rose-100 text-rose-700 border border-rose-200/80 rounded font-semibold shrink-0">
+                          高优
+                        </span>
+                      )}
                       {task.steps?.some((s) => !s.done && s.isDelayed) && (
                         <span className="text-[9px] px-1 py-0.2 bg-rose-100 text-rose-700 rounded font-medium flex items-center gap-0.5 shrink-0">
                           <AlertTriangle className="w-2.5 h-2.5" />

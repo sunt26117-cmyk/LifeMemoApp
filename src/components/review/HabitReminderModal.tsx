@@ -159,10 +159,10 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto">
+      <div className={`${themeColors.cardBg} border ${themeColors.cardBorder} rounded-3xl w-full max-w-md shadow-2xl p-6 relative max-h-[92vh] overflow-y-auto`}>
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors"
+          className={`absolute top-5 right-5 p-1 ${themeColors.textSub} hover:${themeColors.textMain} ${themeColors.subtleHoverBg} rounded-full transition-colors`}
         >
           <X className="w-4 h-4" />
         </button>
@@ -227,7 +227,7 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-500 mb-1 font-medium">结束时间（可选）</label>
+                    <label className="block text-[10px] text-slate-500 mb-1 font-medium">最晚打卡时间（超过禁止打卡）</label>
                     <input
                       type="time"
                       value={endTime}
@@ -237,14 +237,17 @@ export const HabitReminderModal: React.FC<HabitReminderModalProps> = ({
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  例如设定「20:00 ~ 22:00」，即每晚8点到10点为该习惯专注打卡时段。
+                  设定最晚时间后（如「22:00」），当天超过该时间将自动禁止打卡，督促准时养成习惯。
                 </p>
               </div>
 
               {/* 3. Repeat Days of Week */}
               <div className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-700">重复周期（每周多选）</span>
+                  <div>
+                    <span className="text-xs font-semibold text-slate-700">打卡周期（每周多选）</span>
+                    <span className="block text-[10px] text-slate-400">仅在所选周期当天在首页展示打卡按钮</span>
+                  </div>
                   <div className="flex gap-1 text-[10px]">
                     <button
                       type="button"

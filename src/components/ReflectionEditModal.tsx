@@ -201,10 +201,10 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className={`bg-white rounded-2xl w-full max-w-2xl shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
+      <div className={`${themeColors.cardBg} rounded-2xl w-full max-w-2xl shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
         <button
           onClick={resetAndClose}
-          className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+          className={`absolute top-4 right-4 p-1 ${themeColors.textSub} hover:${themeColors.textMain} rounded-full`}
         >
           <X className="w-4 h-4" />
         </button>
@@ -214,10 +214,10 @@ export const ReflectionEditModal: React.FC<ReflectionEditModalProps> = ({
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-800">
+            <h3 className={`text-base font-semibold ${themeColors.textMain}`}>
               {reflection ? '编辑深度反思' : '新建行为反思'}
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className={`text-xs ${themeColors.textSub}`}>
               基于客观事实 · 严格 V1-V5 校验 · 沉淀真实行为证据
             </p>
           </div>

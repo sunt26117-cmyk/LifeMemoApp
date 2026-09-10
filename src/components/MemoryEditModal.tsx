@@ -203,21 +203,21 @@ export const MemoryEditModal: React.FC<MemoryEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className={`bg-white rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
+      <div className={`${themeColors.cardBg} rounded-2xl w-full max-w-lg shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
         <button
           onClick={resetAndClose}
-          className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+          className={`absolute top-4 right-4 p-1 ${themeColors.textSub} hover:${themeColors.textMain} rounded-full`}
         >
           <X className="w-4 h-4" />
         </button>
 
-        <h3 className="text-base font-semibold text-slate-800 mb-4">
+        <h3 className={`text-base font-semibold ${themeColors.textMain} mb-4`}>
           {memory ? '编辑生活记录' : '写记录（图文配图 · 朋友圈式）'}
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">标题（选填）</label>
+            <label className={`block text-xs font-semibold ${themeColors.textMain} mb-1`}>标题（选填）</label>
             <input
               type="text"
               placeholder="简要概括主题，留空自动提取"

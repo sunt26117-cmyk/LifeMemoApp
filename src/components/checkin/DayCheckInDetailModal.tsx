@@ -15,6 +15,7 @@ import { useApp } from '../../context/AppContext';
 import { getLunarDisplay } from '../../utils/lunarUtil';
 import { getThemeColors } from '../../utils/themeStyles';
 import { useModalBackHandler } from '../../services/modalBackManager';
+import { formatLocalDate, parseLocalDate } from '../../utils/dateUtil';
 
 interface DayCheckInDetailModalProps {
   isOpen: boolean;
@@ -41,15 +42,12 @@ export const DayCheckInDetailModal: React.FC<DayCheckInDetailModalProps> = ({
     }
   }, [isOpen]);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => formatLocalDate(), []);
   const isToday = dateStr === todayStr;
   const isPast = dateStr < todayStr;
   const isFuture = dateStr > todayStr;
 
-  const dateObj = useMemo(() => {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
-  }, [dateStr]);
+  const dateObj = useMemo(() => parseLocalDate(dateStr), [dateStr]);
 
   const lunar = useMemo(() => getLunarDisplay(dateObj), [dateObj]);
 

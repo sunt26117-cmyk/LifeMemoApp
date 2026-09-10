@@ -159,10 +159,10 @@ export const TaskStatusModal: React.FC<TaskStatusModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className={`bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
+      <div className={`${themeColors.cardBg} rounded-2xl w-full max-w-md shadow-xl p-6 relative max-h-[90vh] overflow-y-auto border ${themeColors.cardBorder}`}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+          className={`absolute top-4 right-4 p-1 ${themeColors.textSub} hover:${themeColors.textMain} rounded-full`}
         >
           <X className="w-4 h-4" />
         </button>
@@ -172,13 +172,13 @@ export const TaskStatusModal: React.FC<TaskStatusModalProps> = ({
             {targetStatus === '已完成' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
             {targetStatus === '延期' && <Clock className="w-5 h-5 text-amber-500" />}
             {targetStatus === '取消' && <AlertTriangle className="w-5 h-5 text-rose-500" />}
-            <h3 className="text-base font-semibold text-slate-800">
+            <h3 className={`text-base font-semibold ${themeColors.textMain}`}>
               {targetStatus === '已完成' && '完成任务复盘'}
               {targetStatus === '延期' && '记录延期原因与排期'}
               {targetStatus === '取消' && '记录取消原因'}
             </h3>
           </div>
-          <p className="text-xs text-slate-500 font-medium line-clamp-1">{task.title}</p>
+          <p className={`text-xs ${themeColors.textSub} font-medium line-clamp-1`}>{task.title}</p>
         </div>
 
         {/* Complete Fields */}

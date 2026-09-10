@@ -6,6 +6,7 @@ import { getLunarDisplay } from '../../utils/lunarUtil';
 import { ManageHabitsModal } from './ManageHabitsModal';
 import { DayCheckInDetailModal } from '../checkin/DayCheckInDetailModal';
 import { getThemeColors } from '../../utils/themeStyles';
+import { formatLocalDate } from '../../utils/dateUtil';
 
 export const ReviewCalendarTab: React.FC = () => {
   const { checkInRecords, checkInTypes, toggleCheckIn, statAnchorDate, theme } = useApp();
@@ -14,7 +15,7 @@ export const ReviewCalendarTab: React.FC = () => {
   const [showManageTypesModal, setShowManageTypesModal] = useState(false);
   const [selectedDayDetail, setSelectedDayDetail] = useState<string | null>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatLocalDate(new Date());
   const anchorDateStr = statAnchorDate ? statAnchorDate.split('T')[0] : null;
 
   // Filter checkInRecords by statAnchorDate
@@ -29,12 +30,12 @@ export const ReviewCalendarTab: React.FC = () => {
     let count = 0;
     const checkDate = new Date();
     // Check today first, if not checked yet check yesterday
-    const todayFormatted = checkDate.toISOString().split('T')[0];
+    const todayFormatted = formatLocalDate(checkDate);
     if (!datesSet.has(todayFormatted)) {
       checkDate.setDate(checkDate.getDate() - 1);
     }
     while (true) {
-      const dStr = checkDate.toISOString().split('T')[0];
+      const dStr = formatLocalDate(checkDate);
       if (anchorDateStr && dStr < anchorDateStr) break;
       if (datesSet.has(dStr)) {
         count++;
@@ -61,14 +62,14 @@ export const ReviewCalendarTab: React.FC = () => {
     // Preceding padding
     for (let i = startWeekDay - 1; i >= 0; i--) {
       const d = new Date(year, month, -i);
-      days.push({ dateStr: d.toISOString().split('T')[0], dateObj: d, isCurrentMonth: false });
+      days.push({ dateStr: formatLocalDate(d), dateObj: d, isCurrentMonth: false });
     }
 
     // Current month
     for (let d = 1; d <= totalDays; d++) {
       const dateObj = new Date(year, month, d);
       days.push({
-        dateStr: dateObj.toISOString().split('T')[0],
+        dateStr: formatLocalDate(dateObj),
         dateObj,
         isCurrentMonth: true,
       });
@@ -143,12 +144,12 @@ export const ReviewCalendarTab: React.FC = () => {
                 type="button"
                 onClick={() => setSelectedDayDetail(item.dateStr)}
                 title={`点击查看 ${item.dateStr} 当日打卡详情与时间点`}
-                className={`min-h-[52px] p-1 rounded-xl flex flex-col items-center justify-between transition-colors border text-center cursor-pointer ${
+                className={`min-h-[52px] p-1 rounded-xl flex flex-col items-center justify-between transition-all border text-center cursor-pointer active:scale-95 ${
                   !item.isCurrentMonth
                     ? 'opacity-30 border-transparent'
                     : isToday
-                    ? `${themeColors.badgeBg} border-2 ${themeColors.primaryBorder}`
-                    : `${themeColors.cardBorder} hover:${themeColors.subtleBg}`
+                    ? `${themeColors.badgeBg} border-2 ${themeColors.primaryBorder} shadow-2xs font-bold`
+                    : `${themeColors.cardBorder} ${themeColors.subtleHoverBg}`
                 }`}
               >
                 <span

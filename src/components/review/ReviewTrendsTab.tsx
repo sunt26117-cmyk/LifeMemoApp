@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { GrowthEngine } from '../../growth/growthEngine';
 import { AiService } from '../../services/aiService';
 import { getThemeColors } from '../../utils/themeStyles';
+import { formatLocalDate } from '../../utils/dateUtil';
 
 export const ReviewTrendsTab: React.FC = () => {
   const { checkInRecords, checkInTypes, trends, themes, statAnchorDate, theme } = useApp();
@@ -25,8 +26,8 @@ export const ReviewTrendsTab: React.FC = () => {
 
     const now = new Date();
     for (let i = count - 1; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 86400000);
-      const ds = d.toISOString().split('T')[0];
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const ds = formatLocalDate(d);
 
       // If date is before stat_anchor_date, do not query or count check-ins before anchor
       if (anchorDateStr && ds < anchorDateStr) {
@@ -135,7 +136,7 @@ export const ReviewTrendsTab: React.FC = () => {
             {growthPoints.scores.length > 1 && (
               <polyline
                 fill="none"
-                stroke="#4A90D9"
+                stroke={themeColors.primaryHex}
                 strokeWidth="3"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -159,7 +160,10 @@ export const ReviewTrendsTab: React.FC = () => {
                   cx={x}
                   cy={y}
                   r="4"
-                  className="fill-white stroke-[#4A90D9] stroke-2 hover:r-6 cursor-pointer"
+                  fill="white"
+                  stroke={themeColors.primaryHex}
+                  strokeWidth="2"
+                  className="hover:r-6 cursor-pointer transition-all"
                 >
                   <title>{`${growthPoints.labels[i]}: ${s.toFixed(1)}分`}</title>
                 </circle>

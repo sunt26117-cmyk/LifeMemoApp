@@ -6,7 +6,6 @@ import {
   Sparkles,
   BookOpen,
   Settings,
-  Plus,
   Cloud,
   RefreshCw,
 } from 'lucide-react';
@@ -15,10 +14,10 @@ import { supabaseService } from '../services/supabaseService';
 import { getThemeColors } from '../utils/themeStyles';
 
 interface NavigationProps {
-  onQuickAction: () => void;
+  onQuickAction?: () => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
+export const Navigation: React.FC<NavigationProps> = () => {
   const { activeTab, setActiveTab, setSettingsOpen, syncStatus, theme } = useApp();
   const themeColors = getThemeColors(theme);
 
@@ -44,7 +43,7 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
             限
           </div>
           <div>
-            <h1 className="text-base font-semibold text-slate-800 leading-tight flex items-center gap-1.5">
+            <h1 className={`text-base font-semibold ${themeColors.textMain} leading-tight flex items-center gap-1.5`}>
               <span>人生不设限</span>
               <button
                 type="button"
@@ -61,7 +60,7 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
                     ? 'bg-amber-100 text-amber-700'
                     : isConfigured
                     ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-slate-100 text-slate-500'
+                    : `${themeColors.subtleBg} ${themeColors.textSub}`
                 }`}
               >
                 {syncStatus.state === 'syncing' ? (
@@ -72,23 +71,15 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
                 <span>{syncStatus.state === 'syncing' ? '同步中' : isConfigured ? '云端' : '本地'}</span>
               </button>
             </h1>
-            <p className="text-xs text-slate-400">自律 · 洞察 · 闭环</p>
+            <p className={`text-xs ${themeColors.textSub}`}>自律 · 洞察 · 闭环</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            id="btn-quick-create"
-            onClick={onQuickAction}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full shadow-xs transition-all ${themeColors.actionBtn}`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>记录</span>
-          </button>
-          <button
             id="btn-open-settings"
             onClick={() => setSettingsOpen(true)}
-            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100/80 rounded-full transition-colors"
+            className={`p-2 ${themeColors.textSub} hover:${themeColors.textMain} ${themeColors.subtleHoverBg} rounded-full transition-colors`}
             title="系统设置与偏好"
           >
             <Settings className="w-4 h-4" />
@@ -111,7 +102,7 @@ export const Navigation: React.FC<NavigationProps> = ({ onQuickAction }) => {
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all ${
                 isActive
                   ? `${themeColors.activeTabText} font-semibold scale-105`
-                  : 'text-slate-400 hover:text-slate-600'
+                  : `${themeColors.textSub} hover:${themeColors.textMain}`
               }`}
             >
               <div

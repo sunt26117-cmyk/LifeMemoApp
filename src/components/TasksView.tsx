@@ -367,11 +367,11 @@ export const TasksView: React.FC<TasksViewProps> = ({
                       onClick={() => toggleTaskExpand(task.id)}
                       className="flex items-center justify-between text-[11px] cursor-pointer hover:opacity-80 transition-opacity"
                     >
-                      <span className="flex items-center gap-1 font-medium text-slate-700">
-                        <Layers className="w-3.5 h-3.5 text-sky-600" />
+                      <span className={`flex items-center gap-1 font-medium ${themeColors.textMain}`}>
+                        <Layers className={`w-3.5 h-3.5 ${themeColors.primaryText}`} />
                         子步骤进度 ({stepsDone}/{stepsTotal})
                       </span>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <div className={`flex items-center gap-1 text-[10px] ${themeColors.textSub}`}>
                         <span>{expandedTaskIds[task.id] ? '收起步骤' : '查看步骤详情'}</span>
                         {expandedTaskIds[task.id] ? (
                           <ChevronUp className="w-3.5 h-3.5" />
@@ -381,7 +381,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="w-full h-1.5 bg-slate-200/70 rounded-full overflow-hidden my-1.5">
+                    <div className="w-full h-1.5 bg-black/5 rounded-full overflow-hidden my-1.5">
                       <div
                         className={`h-full ${themeColors.primaryBg} rounded-full transition-all`}
                         style={{ width: `${(stepsDone / stepsTotal) * 100}%` }}
@@ -390,7 +390,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
                     {/* 展开的子步骤清单与时间轴状态 */}
                     {expandedTaskIds[task.id] && (
-                      <div className="mt-2.5 space-y-1.5 pt-2 border-t border-slate-200/60">
+                      <div className={`mt-2.5 space-y-1.5 pt-2 border-t ${themeColors.divider}`}>
                         {task.steps?.map((step, sIdx) => {
                           const status = getStepTimeStatus(step);
                           return (
@@ -398,10 +398,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
                               key={sIdx}
                               className={`flex items-center justify-between p-1.5 px-2 rounded-lg text-xs transition-colors ${
                                 step.isDelayed
-                                  ? 'bg-rose-50/70 border border-rose-200'
+                                  ? 'bg-rose-50/80 border border-rose-200'
                                   : step.done
-                                  ? 'bg-white/60 text-slate-400'
-                                  : 'bg-white border border-slate-200/60'
+                                  ? `${themeColors.cardBg}/50 ${themeColors.textSub}`
+                                  : `${themeColors.cardBg} border ${themeColors.cardBorder} shadow-2xs`
                               }`}
                             >
                               <button
@@ -412,22 +412,22 @@ export const TasksView: React.FC<TasksViewProps> = ({
                                 {step.done ? (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                 ) : (
-                                  <Circle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <Circle className={`w-3.5 h-3.5 ${themeColors.textSub} shrink-0`} />
                                 )}
-                                <span className={`truncate ${step.done ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                                  <span className="text-[10px] text-slate-400 mr-1 font-mono">#{sIdx + 1}</span>
+                                <span className={`truncate ${step.done ? `line-through ${themeColors.textSub}` : themeColors.textMain}`}>
+                                  <span className={`text-[10px] ${themeColors.textSub} mr-1 font-mono`}>#{sIdx + 1}</span>
                                   {step.content}
                                 </span>
                               </button>
 
                               <div className="flex items-center gap-1.5 shrink-0 text-[10px] ml-2">
-                                <span className="text-slate-500 font-mono bg-slate-100 px-1 py-0.5 rounded">
+                                <span className={`${themeColors.textMuted} font-mono ${themeColors.subtleBg} px-1 py-0.5 rounded border ${themeColors.subtleBorder}`}>
                                   {step.durationValue ?? 1}
                                   {step.durationUnit || '天'}
                                 </span>
 
                                 {step.estimatedDueTime && (
-                                  <span className="text-slate-400 font-mono hidden sm:inline">
+                                  <span className={`${themeColors.textSub} font-mono hidden sm:inline`}>
                                     {formatFriendlyDateTime(step.estimatedDueTime).slice(5)}
                                   </span>
                                 )}

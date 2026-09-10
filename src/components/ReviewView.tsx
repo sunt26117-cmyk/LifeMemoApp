@@ -25,8 +25,8 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
   const { theme } = useApp();
   const themeColors = getThemeColors(theme);
 
-  const [reviewSubTab, setReviewSubTab] = useState<'reflections' | 'calendar' | 'trends' | 'summary'>(
-    'reflections'
+  const [reviewSubTab, setReviewSubTab] = useState<'calendar' | 'reflections' | 'trends' | 'summary'>(
+    'calendar'
   );
 
   return (
@@ -34,8 +34,8 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
       {/* 4 Sub-Tabs */}
       <div className={`flex p-1 ${themeColors.segmentBg} rounded-2xl gap-1`}>
         {[
-          { id: 'reflections', label: '反思记录', icon: Sparkles },
           { id: 'calendar', label: '打卡日历', icon: Calendar },
+          { id: 'reflections', label: '反思记录', icon: Sparkles },
           { id: 'trends', label: '成长趋势', icon: TrendingUp },
           { id: 'summary', label: '周期总结', icon: Award },
         ].map((tab) => {
@@ -45,10 +45,10 @@ export const ReviewView: React.FC<ReviewViewProps> = ({
             <button
               key={tab.id}
               onClick={() => setReviewSubTab(tab.id as any)}
-              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 text-xs font-medium rounded-xl transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 px-2 text-xs font-medium rounded-xl transition-all cursor-pointer active:scale-95 ${
                 isActive
                   ? `${themeColors.segmentActiveBg} ${themeColors.segmentActiveText} shadow-xs font-semibold`
-                  : `${themeColors.textMuted} hover:${themeColors.textMain}`
+                  : `${themeColors.textMuted} hover:text-slate-800`
               }`}
             >
               <Icon className="w-3.5 h-3.5" />

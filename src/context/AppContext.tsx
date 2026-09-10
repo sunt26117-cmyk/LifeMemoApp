@@ -21,6 +21,8 @@ import { ChangeTaskStatusParams, executeTaskStatusTransition } from '../services
 import { supabaseService, SyncStatus } from '../services/supabaseService';
 import { newUuid } from '../utils/uuidUtil';
 import { habitNotificationService } from '../services/habitNotificationService';
+import { formatLocalDate } from '../utils/dateUtil';
+import { isHabitTimeExpired } from '../utils/habitScheduleUtil';
 
 interface AppContextType {
   // Navigation
@@ -524,7 +526,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCheckInType = (t: CheckInType) => {
     AppStorage.upsertCheckInType(t);
+    AppStorage.syncCheckInTypeNameAndSymbol(t.id, t.name, t.symbol);
     setCheckInTypes(AppStorage.getCheckInTypes());
+    setCheckInRecords(AppStorage.getCheckInRecords());
   };
 
   const getRecordsByDate = useCallback(
@@ -539,7 +543,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type: CheckInType,
     mode: 'overwrite' | 'toggle' = 'overwrite'
   ) => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatLocalDate();
     if (date !== todayStr) {
       if (date > todayStr) {
         showPraise('未来日期尚未到来，暂不能预先打卡');
@@ -551,12 +555,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const prevRecords = [...checkInRecords];
     const existing = prevRecords.find((r) => r.date === date && r.typeId === type.id);
+
+    // 用户明确要求：如果超过了当天设定的最晚时间，超过之后就禁止当天打卡这个习惯
+    if (!existing && isHabitTimeExpired(type, date, false)) {
+      showPraise(`已超过设定最晚打卡时间 (${type.reminder?.targetEndTime})，今日禁止打卡`);
+      return { status: 'rejected' as const, record: null };
+    }
+
     const result = AppStorage.toggleCheckIn(date, type, mode);
     setCheckInRecords(AppStorage.getCheckInRecords());
 
     if (result.status === 'created') {
       showPraise(getCategoryPraise(type.name));
-      const todayStr = new Date().toISOString().slice(0, 10);
       if (date === todayStr) {
         habitNotificationService.onHabitCompletedToday(type.id);
       }

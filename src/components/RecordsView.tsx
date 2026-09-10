@@ -151,9 +151,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             <button
               onClick={onOpenNoteCreate}
               className={`flex items-center gap-1.5 px-3 py-1.5 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl shadow-xs transition-all`}
-              style={{
-                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
-              }}
               title="新建便签"
             >
               <Plus className="w-3.5 h-3.5 text-white" />
@@ -163,9 +160,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             <button
               onClick={onOpenMemoryCreate}
               className={`flex items-center gap-1.5 px-3 py-1.5 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl shadow-xs transition-all`}
-              style={{
-                backgroundColor: theme === 'warm' ? '#B86B35' : theme === 'forest' ? '#3B7D57' : '#4A90D9',
-              }}
               title="写记录"
             >
               <Plus className="w-3.5 h-3.5 text-white" />
@@ -182,7 +176,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           placeholder="模糊搜索记录内容、标题、标签或地点..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full text-xs py-2 px-3 pl-8 ${themeColors.cardBg} border ${themeColors.cardBorder} rounded-xl focus:outline-none focus:ring-1 focus:ring-sky-400 shadow-xs ${themeColors.textMain}`}
+          className={`w-full text-xs py-2 px-3 pl-8 ${themeColors.cardBg} border ${themeColors.cardBorder} rounded-xl focus:outline-none ${themeColors.focusRing} shadow-xs ${themeColors.textMain}`}
         />
         <Search className={`w-3.5 h-3.5 ${themeColors.textSub} absolute left-2.5 top-3`} />
         {searchQuery && (

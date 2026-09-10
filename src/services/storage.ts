@@ -28,6 +28,8 @@ import {
 } from './mockData';
 import { supabaseService } from './supabaseService';
 import { ensureUuid } from '../utils/uuidUtil';
+import { formatLocalDate } from '../utils/dateUtil';
+import { isHabitTimeExpired } from '../utils/habitScheduleUtil';
 import { computeStepsTimeline } from '../utils/taskTimeUtil';
 
 export function getPeriodKey(
@@ -432,6 +434,20 @@ export class AppStorage {
     }
     this.saveCheckInTypes(items);
   }
+  static syncCheckInTypeNameAndSymbol(typeId: string, newName: string, newSymbol: string): void {
+    const records = this.getCheckInRecords();
+    let modified = false;
+    const updated = records.map((r) => {
+      if (r.typeId === typeId && (r.typeName !== newName || r.symbol !== newSymbol)) {
+        modified = true;
+        return { ...r, typeName: newName, symbol: newSymbol };
+      }
+      return r;
+    });
+    if (modified) {
+      this.saveCheckInRecords(updated);
+    }
+  }
 
   // CheckInRecords
   static getCheckInRecords(): CheckInRecord[] {
@@ -449,7 +465,7 @@ export class AppStorage {
     type: CheckInType,
     mode: 'overwrite' | 'toggle' = 'overwrite'
   ): { status: 'created' | 'updated' | 'removed' | 'rejected'; record: CheckInRecord | null; previousTime?: string } {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatLocalDate();
     // 黄金规则与用户明确要求：除今天外，历史日期与未来日期均禁止打卡或改动
     if (date !== todayStr) {
       return { status: 'rejected', record: null };
@@ -458,6 +474,11 @@ export class AppStorage {
     const items = this.getCheckInRecords();
     const existingIdx = items.findIndex((r) => r.date === date && r.typeId === type.id);
     const now = new Date();
+
+    // 用户明确要求：如果超过了当天设定的最晚时间，超过之后就禁止当天打卡这个习惯
+    if (existingIdx < 0 && isHabitTimeExpired(type, date, false, now)) {
+      return { status: 'rejected', record: null };
+    }
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
     const currentTimeStr = `${hh}:${mm}`;

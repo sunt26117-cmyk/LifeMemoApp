@@ -16,6 +16,8 @@ import { CheckInCapsuleItem } from './CheckInCapsuleItem';
 import { DayCheckInDetailModal } from './DayCheckInDetailModal';
 import { CheckInType } from '../../types';
 import { getThemeColors } from '../../utils/themeStyles';
+import { formatLocalDate } from '../../utils/dateUtil';
+import { isHabitScheduledForDate } from '../../utils/habitScheduleUtil';
 
 interface CollapsibleCheckInListProps {
   onOpenManageHabits?: () => void;
@@ -27,15 +29,10 @@ export const CollapsibleCheckInList: React.FC<CollapsibleCheckInListProps> = ({
   const { checkInTypes, getRecordsByDate, toggleCheckIn, setActiveTab, theme } = useApp();
   const themeColors = getThemeColors(theme);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => formatLocalDate(), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [isCollapsedCard, setIsCollapsedCard] = useState<boolean>(false);
   const [detailModalDate, setDetailModalDate] = useState<string | null>(null);
-
-  // Enabled check-in tasks
-  const enabledTypes = useMemo(() => {
-    return checkInTypes.filter((t) => t.enabled);
-  }, [checkInTypes]);
 
   // Check-in records for currently selected date
   const dateRecords = useMemo(() => {
@@ -50,12 +47,23 @@ export const CollapsibleCheckInList: React.FC<CollapsibleCheckInListProps> = ({
     return map;
   }, [dateRecords]);
 
-  // Statistics
-  const completedCount = useMemo(() => {
-    return enabledTypes.filter((t) => recordsMap.has(t.id)).length;
-  }, [enabledTypes, recordsMap]);
+  // 根据用户设定的周期筛选当天的打卡按钮：
+  // 1. 启用的习惯
+  // 2. 符合当天周期的习惯（若未设定则默认每天），或当天已有记录的习惯（确保成果不丢失）
+  const scheduledTypes = useMemo(() => {
+    return checkInTypes.filter((t) => {
+      if (!t.enabled) return false;
+      if (recordsMap.has(t.id)) return true;
+      return isHabitScheduledForDate(t, selectedDate);
+    });
+  }, [checkInTypes, selectedDate, recordsMap]);
 
-  const totalCount = enabledTypes.length;
+  // Statistics: 基于当天需要打卡的习惯项计算完成度
+  const completedCount = useMemo(() => {
+    return scheduledTypes.filter((t) => recordsMap.has(t.id)).length;
+  }, [scheduledTypes, recordsMap]);
+
+  const totalCount = scheduledTypes.length;
 
   // Date status
   const isToday = selectedDate === todayStr;
@@ -187,22 +195,26 @@ export const CollapsibleCheckInList: React.FC<CollapsibleCheckInListProps> = ({
         {/* Habit Row Section: Habits arranged in a horizontal side-by-side row */}
         {!isCollapsedCard && (
           <>
-            {enabledTypes.length === 0 ? (
+            {scheduledTypes.length === 0 ? (
               <div className="text-center py-4 border border-dashed border-slate-200 rounded-2xl">
-                <p className="text-xs text-slate-400">暂无启用的打卡项</p>
+                <p className="text-xs text-slate-400">
+                  {checkInTypes.some((t) => t.enabled)
+                    ? '今日设定的周期无需打卡，享受当下节奏'
+                    : '暂无启用的打卡项'}
+                </p>
                 {onOpenManageHabits && (
                   <button
                     type="button"
                     onClick={onOpenManageHabits}
                     className={`mt-1.5 text-xs font-semibold ${themeColors.primaryText} hover:underline`}
                   >
-                    前往添加习惯项
+                    管理习惯与周期
                   </button>
                 )}
               </div>
             ) : (
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-0.5">
-                {enabledTypes.map((type) => (
+                {scheduledTypes.map((type) => (
                   <CheckInCapsuleItem
                     key={type.id}
                     type={type}

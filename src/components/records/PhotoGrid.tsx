@@ -3,6 +3,7 @@ import React from 'react';
 import { CheckCircle2, Edit2, Image as ImageIcon, MapPin, Maximize2, Trash2 } from 'lucide-react';
 import { Photo } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { getThemeColors } from '../../utils/themeStyles';
 
 interface PhotoGridProps {
   photos: Photo[];
@@ -19,21 +20,22 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const { openPhotoPreview } = useApp();
+  const { openPhotoPreview, theme } = useApp();
+  const themeColors = getThemeColors(theme);
 
   if (photos.length === 0) return null;
 
   return (
-    <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs">
+    <div className={`${themeColors.cardBg} p-3.5 rounded-2xl border ${themeColors.cardBorder} shadow-xs`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+        <span className={`text-xs font-semibold ${themeColors.textMain} flex items-center gap-1`}>
           <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
           <span>照片记录 ({photos.length})</span>
         </span>
         {activeSubTab === 'all' && (
           <button
             onClick={onViewAll}
-            className="text-[11px] text-[#4A90D9] hover:underline font-medium"
+            className={`text-[11px] ${themeColors.primaryText} hover:underline font-medium`}
           >
             查看全部
           </button>
@@ -50,7 +52,7 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
                 photo.aiSummary || photo.locationName || '生活记录照片'
               )
             }
-            className="group relative aspect-square rounded-xl overflow-hidden border border-slate-100 bg-slate-100 cursor-pointer shadow-xs hover:shadow-md transition-all"
+            className={`group relative aspect-square rounded-xl overflow-hidden border ${themeColors.cardBorder} ${themeColors.subtleBg} cursor-pointer shadow-xs hover:shadow-md transition-all`}
             title="点击全屏查看大图"
           >
             <img src={photo.localPath} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />

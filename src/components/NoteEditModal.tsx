@@ -73,27 +73,27 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-      <div className={`bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative border ${themeColors.cardBorder}`}>
+      <div className={`${themeColors.cardBg} rounded-2xl w-full max-w-md shadow-xl p-6 relative border ${themeColors.cardBorder}`}>
         <button
           onClick={resetAndClose}
-          className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+          className={`absolute top-4 right-4 p-1 ${themeColors.textSub} hover:${themeColors.textMain} rounded-full`}
         >
           <X className="w-4 h-4" />
         </button>
 
-        <h3 className="text-base font-semibold text-slate-800 mb-4">
+        <h3 className={`text-base font-semibold ${themeColors.textMain} mb-4`}>
           {note ? '编辑便签' : '随手便签'}
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">便签标题</label>
+            <label className={`block text-xs font-semibold ${themeColors.textMain} mb-1`}>便签标题</label>
             <input
               type="text"
               placeholder="例如：下周会议备忘 / 突发灵感"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className={`w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none ${themeColors.focusRing}`}
+              className={`w-full text-xs p-2.5 ${themeColors.subtleBg} border ${themeColors.subtleBorder} ${themeColors.textMain} rounded-xl focus:outline-none ${themeColors.focusRing}`}
             />
           </div>
 

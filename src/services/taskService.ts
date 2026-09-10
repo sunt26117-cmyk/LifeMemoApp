@@ -4,6 +4,7 @@ import { AppStorage } from './storage';
 import { processTaskEvent, TaskTransitionEvent } from './trendEngine';
 import { calculateNextRecurringDates, computeStepsTimeline } from '../utils/taskTimeUtil';
 import { newUuid } from '../utils/uuidUtil';
+import { formatLocalDate } from '../utils/dateUtil';
 
 export interface ChangeTaskStatusParams {
   taskId: string;
@@ -49,7 +50,7 @@ export function executeTaskStatusTransition(
     if (target.checkInTypeId) {
       const checkType = checkInTypes.find((c) => c.id === target.checkInTypeId);
       if (checkType) {
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = formatLocalDate(now);
         const currentRecords = AppStorage.getCheckInRecords();
         const hasChecked = currentRecords.some(
           (r) => r.date === todayStr && r.typeId === checkType.id

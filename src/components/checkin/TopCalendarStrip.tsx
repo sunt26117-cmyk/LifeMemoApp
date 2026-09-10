@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RotateCcw, Info } 
 import { useApp } from '../../context/AppContext';
 import { getLunarDisplay } from '../../utils/lunarUtil';
 import { getThemeColors } from '../../utils/themeStyles';
+import { formatLocalDate, parseLocalDate } from '../../utils/dateUtil';
 
 interface TopCalendarStripProps {
   selectedDate: string; // YYYY-MM-DD
@@ -19,19 +20,18 @@ export const TopCalendarStrip: React.FC<TopCalendarStripProps> = ({
   const { checkInRecords, theme } = useApp();
   const themeColors = getThemeColors(theme);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => formatLocalDate(), []);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Generate rolling 14-day window: 7 days before selectedDate/today to 6 days after
   const dates = useMemo(() => {
-    const baseDate = new Date(selectedDate || todayStr);
+    const baseDate = parseLocalDate(selectedDate || todayStr);
     const result: { dateStr: string; dateObj: Date; dayOfWeek: string; isToday: boolean }[] = [];
     const WEEK_DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
     for (let offset = -6; offset <= 7; offset++) {
-      const d = new Date(baseDate);
-      d.setDate(d.getDate() + offset);
-      const dateStr = d.toISOString().split('T')[0];
+      const d = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + offset);
+      const dateStr = formatLocalDate(d);
       result.push({
         dateStr,
         dateObj: d,
@@ -67,10 +67,7 @@ export const TopCalendarStrip: React.FC<TopCalendarStripProps> = ({
   const isSelectedToday = selectedDate === todayStr;
   const isSelectedPast = selectedDate < todayStr;
   const isSelectedFuture = selectedDate > todayStr;
-  const selDateObj = useMemo(() => {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
-  }, [selectedDate]);
+  const selDateObj = useMemo(() => parseLocalDate(selectedDate), [selectedDate]);
 
   const lunar = useMemo(() => getLunarDisplay(selDateObj), [selDateObj]);
 
@@ -139,12 +136,12 @@ export const TopCalendarStrip: React.FC<TopCalendarStripProps> = ({
               type="button"
               data-selected={isSelected}
               onClick={() => handleDateClick(item.dateStr)}
-              className={`flex-shrink-0 flex flex-col items-center justify-between w-10.5 py-1 px-0.5 rounded-xl border transition-all text-center select-none ${
+              className={`flex-shrink-0 flex flex-col items-center justify-between w-10.5 py-1 px-0.5 rounded-xl border transition-all text-center select-none active:scale-95 cursor-pointer ${
                 isSelected
-                  ? `${themeColors.badgeBg} border-2 ${themeColors.primaryBorder} shadow-2xs scale-102`
+                  ? `${themeColors.badgeBg} border-2 ${themeColors.primaryBorder} shadow-2xs scale-102 font-bold`
                   : item.isToday
-                  ? `${themeColors.cardBg} border-amber-300 shadow-2xs hover:${themeColors.subtleBg}`
-                  : `${themeColors.cardBg} ${themeColors.subtleBorder} hover:${themeColors.subtleBg}`
+                  ? `${themeColors.cardBg} border-amber-300/80 shadow-2xs ${themeColors.subtleHoverBg}`
+                  : `${themeColors.cardBg} ${themeColors.subtleBorder} ${themeColors.subtleHoverBg}`
               }`}
             >
               <span

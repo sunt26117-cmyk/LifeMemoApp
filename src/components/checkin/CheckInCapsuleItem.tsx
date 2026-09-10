@@ -1,10 +1,12 @@
 // src/components/checkin/CheckInCapsuleItem.tsx
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { CheckCircle2, RotateCw, X, History } from 'lucide-react';
+import { CheckCircle2, RotateCw, X, History, Clock, Ban } from 'lucide-react';
 import { CheckInRecord, CheckInType } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { getThemeColors } from '../../utils/themeStyles';
 import { useModalBackHandler } from '../../services/modalBackManager';
+import { formatLocalDate } from '../../utils/dateUtil';
+import { isHabitTimeExpired } from '../../utils/habitScheduleUtil';
 
 interface CheckInCapsuleItemProps {
   type: CheckInType;
@@ -21,7 +23,7 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
   onToggle,
   onOpenDayDetail,
 }) => {
-  const { theme } = useApp();
+  const { theme, showPraise } = useApp();
   const themeColors = getThemeColors(theme);
 
   const [showMenu, setShowMenu] = useState(false);
@@ -39,7 +41,7 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
     }
   }, [showMenu, showHistoryModal]);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => formatLocalDate(), []);
   const isToday = selectedDate === todayStr;
   const isPast = selectedDate < todayStr;
   const isFuture = selectedDate > todayStr;
@@ -48,6 +50,11 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
   const checkedTimeStr =
     record?.checkInTime ||
     (record?.createdAt ? new Date(record.createdAt).toTimeString().slice(0, 5) : '');
+
+  // 检查是否超过了当天设定的最晚打卡时间：超过之后禁止当天打卡
+  const isTimeExpired = useMemo(() => {
+    return isHabitTimeExpired(type, selectedDate, isChecked);
+  }, [type, selectedDate, isChecked]);
 
   const previousList = record?.previousCheckIns || [];
 
@@ -89,6 +96,11 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
 
     // Today:
     if (!isChecked) {
+      // 用户明确要求：如果超过了我当天的设定的最晚时间 超过之后就禁止当天打卡这个习惯
+      if (isTimeExpired) {
+        showPraise(`已超过设定最晚打卡时间 (${type.reminder?.targetEndTime})，今日已禁止打卡`);
+        return;
+      }
       // Direct check-in with current timestamp
       onToggle(type, 'overwrite');
     } else {
@@ -106,14 +118,16 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`flex flex-col items-center justify-between w-[70px] sm:w-[74px] min-h-[86px] p-2 rounded-2xl border transition-all select-none cursor-pointer text-center active:scale-95 ${
+        className={`flex flex-col items-center justify-between w-[70px] sm:w-[74px] min-h-[86px] p-2 rounded-2xl border transition-all select-none text-center active:scale-95 ${
           isChecked
-            ? 'bg-emerald-50/90 border-emerald-300 shadow-2xs'
+            ? 'bg-emerald-50/90 border-emerald-300 shadow-2xs cursor-pointer'
+            : isToday && isTimeExpired
+            ? 'bg-rose-50/60 border-rose-200/90 opacity-80 cursor-not-allowed'
             : isPast
-            ? 'bg-slate-50/60 border-slate-200/70 opacity-75'
+            ? 'bg-slate-50/60 border-slate-200/70 opacity-75 cursor-pointer'
             : isFuture
-            ? 'bg-slate-50/40 border-slate-200/50 opacity-60'
-            : `${themeColors.cardBg} ${themeColors.cardBorder} hover:border-slate-300 shadow-2xs`
+            ? 'bg-slate-50/40 border-slate-200/50 opacity-60 cursor-pointer'
+            : `${themeColors.cardBg} ${themeColors.cardBorder} hover:border-slate-300 shadow-2xs cursor-pointer`
         }`}
         title={
           isPast
@@ -122,6 +136,8 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
             ? `${type.name} (未来日期未开始)`
             : isChecked
             ? `${type.name}: 已打卡 ${checkedTimeStr} (点击可管理或撤销)`
+            : isToday && isTimeExpired
+            ? `${type.name}: 已过最晚打卡时间 (${type.reminder?.targetEndTime})，今日禁止打卡`
             : `${type.name}: 点击立即打卡`
         }
       >
@@ -130,6 +146,8 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
           className={`relative w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 transition-transform group-hover:scale-105 ${
             isChecked
               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs'
+              : isToday && isTimeExpired
+              ? 'bg-rose-100/70 text-rose-800 border border-rose-200'
               : isPast
               ? 'bg-slate-100 text-slate-400 border border-slate-200/80'
               : `${themeColors.subtleBg} border ${themeColors.subtleBorder} text-slate-700`
@@ -142,12 +160,22 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
               <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
             </span>
           )}
+
+          {!isChecked && isToday && isTimeExpired && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center text-white ring-2 ring-white shadow-xs" title="已过最晚时间">
+              <Clock className="w-2.5 h-2.5 stroke-[2.5]" />
+            </span>
+          )}
         </div>
 
         {/* Habit Name */}
         <span
           className={`text-[11px] font-semibold truncate w-full mt-1.5 leading-tight ${
-            isChecked ? 'text-emerald-950 font-bold' : themeColors.textMain
+            isChecked
+              ? 'text-emerald-950 font-bold'
+              : isToday && isTimeExpired
+              ? 'text-rose-900 font-medium'
+              : themeColors.textMain
           }`}
         >
           {type.name}
@@ -158,6 +186,10 @@ export const CheckInCapsuleItem: React.FC<CheckInCapsuleItemProps> = ({
           {isChecked ? (
             <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-200/80 px-1 py-0.2 rounded leading-none">
               {checkedTimeStr}
+            </span>
+          ) : isToday && isTimeExpired ? (
+            <span className="text-[9px] font-mono font-medium text-rose-700 bg-rose-100/80 border border-rose-200 px-1 py-0.2 rounded leading-none">
+              截止{type.reminder?.targetEndTime}
             </span>
           ) : (
             // 撤销或未打卡状态下时间消失，保持卡片高度整齐
