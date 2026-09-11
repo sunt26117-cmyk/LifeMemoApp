@@ -294,6 +294,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('app_storage_updated', handleStorageUpdate);
   }, []);
 
+  // 保持系统底层闹钟（支持完全退出/锁屏唤醒）与习惯及今日打卡状态自动同步
+  useEffect(() => {
+    habitNotificationService.syncAllHabitSchedules(checkInTypes, checkInRecords);
+  }, [checkInTypes, checkInRecords]);
+
 
   // Upload all local data to Supabase
   const uploadToSupabase = async () => {

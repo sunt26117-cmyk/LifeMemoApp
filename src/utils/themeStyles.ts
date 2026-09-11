@@ -68,6 +68,22 @@ export interface ThemeColors {
   metricReflectionsBg: string;
   metricReflectionsBorder: string;
   metricReflectionsText: string;
+
+  // Dedicated Thematic Semantic Tokens for Task & Record Boxes
+  progressTrackBg: string;
+  statPillBg: string;
+  statPillBorder: string;
+  quoteBoxBg: string;
+  quoteBoxBorder: string;
+  quoteBoxText: string;
+  alertWarningBg: string;
+  alertWarningText: string;
+  alertWarningBorder: string;
+  inProgressPill: string;
+  highPriorityPill: string;
+  completionPill: string;
+  totalPill: string;
+  inProgressCardBorder: string;
 }
 
 export function getThemeColors(theme: AppTheme): ThemeColors {
@@ -136,6 +152,21 @@ export function getThemeColors(theme: AppTheme): ThemeColors {
         metricReflectionsBg: 'bg-[#88421E]/40',
         metricReflectionsBorder: 'border-[#E8B490]/50',
         metricReflectionsText: 'text-[#FCE6DA]',
+        // Dedicated Thematic Semantic Tokens for Task & Record Boxes
+        progressTrackBg: 'bg-[#EADFCF]',
+        statPillBg: 'bg-[#F6EFE5]',
+        statPillBorder: 'border-[#E5D7C3]',
+        quoteBoxBg: 'bg-gradient-to-r from-[#FDF5EB] to-[#F7EDE0]',
+        quoteBoxBorder: 'border-[#B86B35]',
+        quoteBoxText: 'text-[#88421E]',
+        alertWarningBg: 'bg-[#FDF0E6]',
+        alertWarningText: 'text-[#C25828]',
+        alertWarningBorder: 'border-[#F5CDAD]',
+        inProgressPill: 'bg-[#F9EAD9] border border-[#ECD1B5] text-[#9E5828]',
+        highPriorityPill: 'bg-[#FCEAE6] border border-[#F5C9BE] text-[#B54228]',
+        completionPill: 'bg-[#EAF2E9] border border-[#CEE0CD] text-[#2F6B38]',
+        totalPill: 'bg-[#F3E8DA] border border-[#E2D2C0] text-[#5C4837]',
+        inProgressCardBorder: 'border-[#B86B35]/80 ring-1 ring-[#B86B35]/20 shadow-xs',
       };
 
     case 'forest':
@@ -202,6 +233,22 @@ export function getThemeColors(theme: AppTheme): ThemeColors {
         metricReflectionsBg: 'bg-[#184F35]/40',
         metricReflectionsBorder: 'border-[#85C7A4]/50',
         metricReflectionsText: 'text-[#D9F5E6]',
+
+        // Dedicated Thematic Semantic Tokens for Task & Record Boxes
+        progressTrackBg: 'bg-[#D5E3D8]',
+        statPillBg: 'bg-[#E5F1E9]',
+        statPillBorder: 'border-[#C8DEC0]',
+        quoteBoxBg: 'bg-gradient-to-r from-[#EDF7F1] to-[#E3F2E8]',
+        quoteBoxBorder: 'border-[#3B7D57]',
+        quoteBoxText: 'text-[#1F5435]',
+        alertWarningBg: 'bg-[#FEF6EC]',
+        alertWarningText: 'text-[#B06A26]',
+        alertWarningBorder: 'border-[#F4D7B5]',
+        inProgressPill: 'bg-[#E0F2E9] border border-[#C5E7D4] text-[#256B45]',
+        highPriorityPill: 'bg-[#FDF0EC] border border-[#F6D2C8] text-[#B54A32]',
+        completionPill: 'bg-[#E2F5E9] border border-[#C0ECCF] text-[#1E6B39]',
+        totalPill: 'bg-[#E4ECE7] border border-[#CCE0D3] text-[#334D3D]',
+        inProgressCardBorder: 'border-[#3B7D57]/80 ring-1 ring-[#3B7D57]/20 shadow-xs',
       };
 
     case 'sky':
@@ -269,6 +316,22 @@ export function getThemeColors(theme: AppTheme): ThemeColors {
         metricReflectionsBg: 'bg-indigo-500/30',
         metricReflectionsBorder: 'border-indigo-300/50',
         metricReflectionsText: 'text-indigo-100',
+
+        // Dedicated Thematic Semantic Tokens for Task & Record Boxes
+        progressTrackBg: 'bg-[#DDE8F4]',
+        statPillBg: 'bg-[#EAF2FA]',
+        statPillBorder: 'border-[#CADDF0]',
+        quoteBoxBg: 'bg-gradient-to-r from-[#F0F6FD] to-[#E5EFFB]',
+        quoteBoxBorder: 'border-[#4A90D9]',
+        quoteBoxText: 'text-[#1D4ED8]',
+        alertWarningBg: 'bg-[#FEF2F2]',
+        alertWarningText: 'text-[#DC2626]',
+        alertWarningBorder: 'border-[#FECACA]',
+        inProgressPill: 'bg-[#E0F0FE] border border-[#BAE0FD] text-[#0369A1]',
+        highPriorityPill: 'bg-[#FFE4E6] border border-[#FECDD3] text-[#BE123C]',
+        completionPill: 'bg-[#DCFCE7] border border-[#BBF7D0] text-[#15803D]',
+        totalPill: 'bg-[#E2E8F0] border border-[#CBD5E1] text-[#334155]',
+        inProgressCardBorder: 'border-sky-300 ring-1 ring-sky-100 shadow-xs',
       };
   }
 }

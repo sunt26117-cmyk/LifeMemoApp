@@ -3,16 +3,17 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { CheckInType, CheckInRecord } from '../types';
 import { AppStorage } from './storage';
+import {
+  ActiveHabitBanner,
+  NotificationListener,
+  getNumericId,
+  getScheduleId,
+  getLocalDateString,
+  getHabitNotificationContent,
+  buildHabitSchedules,
+} from './habitNotificationHelper';
 
-export interface ActiveHabitBanner {
-  habitId: string;
-  habitName: string;
-  symbol: string;
-  timeText: string;
-  reminderTime: string;
-}
-
-type NotificationListener = (activeBanners: ActiveHabitBanner[]) => void;
+export type { ActiveHabitBanner };
 
 class HabitNotificationService {
   private activeWebNotifications = new Map<string, Notification>();
@@ -27,25 +28,23 @@ class HabitNotificationService {
     this.startEngine();
   }
 
-  // Generate 32-bit positive integer for Capacitor LocalNotifications
   public getNumericId(id: string): number {
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) {
-      hash = (hash * 31 + id.charCodeAt(i)) & 0x7fffffff;
-    }
-    return hash === 0 ? 1001 : hash;
+    return getNumericId(id);
   }
 
-  // Initialize Android Notification Channel for high priority heads-up notifications
+  public getScheduleId(habitId: string, dayOfWeek: number): number {
+    return getScheduleId(habitId, dayOfWeek);
+  }
+
   private async initAndroidChannel() {
     if (Capacitor.isNativePlatform() && !this.channelInitialized) {
       try {
         await LocalNotifications.createChannel({
           id: 'habit-reminders',
           name: '习惯打卡提醒',
-          description: '生活记录应用习惯定时打卡提醒与通知',
-          importance: 5, // NotificationManager.IMPORTANCE_HIGH
-          visibility: 1, // NotificationCompat.VISIBILITY_PUBLIC
+          description: '生活记录应用习惯定时打卡提醒（支持系统底层闹钟定时唤醒）',
+          importance: 5,
+          visibility: 1,
           vibration: true,
           lights: true,
         });
@@ -56,13 +55,12 @@ class HabitNotificationService {
     }
   }
 
-  // Handle user tapping the notification in notification bar
   private async initActionListener() {
     if (Capacitor.isNativePlatform()) {
       try {
         await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
           const habitId = action.notification.extra?.habitId;
-          const date = action.notification.extra?.date;
+          const date = action.notification.extra?.date || getLocalDateString(new Date());
           if (habitId) {
             window.dispatchEvent(
               new CustomEvent('habit_reminder_click', {
@@ -77,15 +75,10 @@ class HabitNotificationService {
     }
   }
 
-  // Check if system notification API is supported (native Android/iOS or web browser)
   public isSupported(): boolean {
-    if (Capacitor.isNativePlatform()) {
-      return true;
-    }
-    return typeof window !== 'undefined' && 'Notification' in window;
+    return Capacitor.isNativePlatform() || (typeof window !== 'undefined' && 'Notification' in window);
   }
 
-  // Get current permission status (mapped to standard 'granted' | 'denied' | 'default')
   public async getPermissionAsync(): Promise<NotificationPermission> {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -98,34 +91,24 @@ class HabitNotificationService {
         return 'default';
       }
     }
-
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      return Notification.permission;
-    }
-    return 'denied';
+    return typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'denied';
   }
 
-  // Synchronous permission getter for initial UI render
   public getPermission(): NotificationPermission {
-    if (Capacitor.isNativePlatform()) {
-      // In native environment, default to default/granted check asynchronously
-      return 'default';
-    }
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      return Notification.permission;
-    }
-    return 'denied';
+    if (Capacitor.isNativePlatform()) return 'default';
+    return typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'denied';
   }
 
-  // Request system notification permission
   public async requestPermission(): Promise<NotificationPermission> {
     if (Capacitor.isNativePlatform()) {
       try {
         await this.initAndroidChannel();
         const res = await LocalNotifications.requestPermissions();
-        if (res.display === 'granted') return 'granted';
-        if (res.display === 'denied') return 'denied';
-        return 'default';
+        if (res.display === 'granted') {
+          await this.syncAllHabitSchedules();
+          return 'granted';
+        }
+        return res.display === 'denied' ? 'denied' : 'default';
       } catch (e) {
         console.warn('[HabitNotification] Native requestPermissions error:', e);
         return 'denied';
@@ -134,18 +117,15 @@ class HabitNotificationService {
 
     if (typeof window !== 'undefined' && 'Notification' in window) {
       try {
-        const perm = await Notification.requestPermission();
-        return perm;
+        return await Notification.requestPermission();
       } catch (e) {
         console.warn('[HabitNotification] Web requestPermission error:', e);
         return Notification.permission;
       }
     }
-
     return 'denied';
   }
 
-  // Subscribe to in-app banners
   public subscribe(listener: NotificationListener): () => void {
     this.listeners.push(listener);
     listener(this.activeBanners);
@@ -158,20 +138,15 @@ class HabitNotificationService {
     this.listeners.forEach((l) => l([...this.activeBanners]));
   }
 
-  // Dismiss in-app banner for a habit
   public dismissBanner(habitId: string) {
     this.activeBanners = this.activeBanners.filter((b) => b.habitId !== habitId);
     this.notifyListeners();
   }
 
-  // Start periodic background checking engine
   public startEngine() {
     if (this.intervalId) return;
-    // Check every 30 seconds
     this.checkReminders();
-    this.intervalId = setInterval(() => {
-      this.checkReminders();
-    }, 30000);
+    this.intervalId = setInterval(() => this.checkReminders(), 30000);
   }
 
   public stopEngine() {
@@ -181,147 +156,126 @@ class HabitNotificationService {
     }
   }
 
-  // Main reminder evaluation loop
+  /**
+   * 【核心架构升级】向手机操作系统底层（Android AlarmManager）预注册系统定时闹钟
+   */
+  public async syncAllHabitSchedules(
+    customHabits?: CheckInType[],
+    customRecords?: CheckInRecord[]
+  ): Promise<void> {
+    const habits = customHabits || AppStorage.getCheckInTypes();
+    const checkInRecords = customRecords || AppStorage.getCheckInRecords();
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await this.initAndroidChannel();
+        const perm = await this.getPermissionAsync();
+        if (perm !== 'granted') return;
+
+        // 清理原有待触发闹钟，防止编辑时间或删除习惯后残留
+        try {
+          const pending = await LocalNotifications.getPending();
+          if (pending.notifications && pending.notifications.length > 0) {
+            await LocalNotifications.cancel({
+              notifications: pending.notifications.map((n) => ({ id: n.id })),
+            });
+          }
+        } catch (_) {}
+
+        const notificationsToSchedule = buildHabitSchedules(habits, checkInRecords);
+        if (notificationsToSchedule.length > 0) {
+          await LocalNotifications.schedule({ notifications: notificationsToSchedule });
+        }
+      } catch (err) {
+        console.warn('[HabitNotification] syncAllHabitSchedules error:', err);
+      }
+    }
+
+    await this.checkReminders();
+  }
+
   public async checkReminders() {
     if (typeof window === 'undefined') return;
 
     const now = new Date();
-    const currentDay = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const currentDay = now.getDay();
     const currentHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const todayStr = this.getLocalDateString(now);
+    const todayStr = getLocalDateString(now);
 
-    const habits: CheckInType[] = AppStorage.getCheckInTypes();
-    const checkInRecords: CheckInRecord[] = AppStorage.getCheckInRecords();
+    const habits = AppStorage.getCheckInTypes();
+    const checkInRecords = AppStorage.getCheckInRecords();
 
     for (const habit of habits) {
-      if (!habit.enabled || !habit.reminder || !habit.reminder.enabled) continue;
-
-      const reminder = habit.reminder;
-      const daysOfWeek = reminder.daysOfWeek || [];
-
-      // Check if today is an active day
+      if (!habit.enabled || !habit.reminder?.enabled) continue;
+      const daysOfWeek = habit.reminder.daysOfWeek || [];
       if (!daysOfWeek.includes(currentDay)) {
         await this.closeNotification(habit.id);
         continue;
       }
 
-      // Check if user already checked in today for this habit
       const isAlreadyCheckedIn = checkInRecords.some(
         (r) => r.date === todayStr && r.typeId === habit.id
       );
 
-      // 【核心防打扰铁律】：如果我完成了当前习惯打卡通知栏消失；如果我提前完成了打卡即使到提醒时间也不要提醒
       if (isAlreadyCheckedIn) {
         await this.closeNotification(habit.id);
         this.dismissBanner(habit.id);
         continue;
       }
 
-      // Determine reminder trigger time (HH:mm)
-      const triggerTime = reminder.reminderTime || reminder.targetStartTime || '21:00';
-
-      // Check if trigger time has arrived today
+      const triggerTime = habit.reminder.reminderTime || habit.reminder.targetStartTime || '21:00';
       if (currentHm >= triggerTime) {
         const todayAlertKey = `habit_alert_${habit.id}_${todayStr}`;
-        const alreadyAlerted = localStorage.getItem(todayAlertKey);
-
-        if (!alreadyAlerted) {
-          // Fire notification!
+        if (!localStorage.getItem(todayAlertKey)) {
           localStorage.setItem(todayAlertKey, currentHm);
-          await this.dispatchNotification(habit, todayStr);
+          await this.dispatchForegroundNotification(habit, todayStr);
         }
       }
     }
   }
 
-  // Send real system notification and in-app banner
-  public async dispatchNotification(habit: CheckInType, todayStr: string) {
-    const reminder = habit.reminder;
-    const timeText =
-      reminder?.targetStartTime && reminder?.targetEndTime
-        ? `${reminder.targetStartTime} ~ ${reminder.targetEndTime}`
-        : reminder?.targetStartTime || reminder?.reminderTime || '';
+  public async dispatchForegroundNotification(habit: CheckInType, todayStr: string) {
+    const { timeText, title, body } = getHabitNotificationContent(habit);
 
-    const title = `⏰ 习惯打卡提醒：${habit.symbol} ${habit.name}`;
-    const body = `该进行「${habit.name}」打卡了！计划时段：${timeText}。打卡完成后通知将自动清除。`;
-
-    // 1. Android Native Local Notification via Capacitor
-    if (Capacitor.isNativePlatform()) {
-      try {
-        await this.initAndroidChannel();
-        const numericId = this.getNumericId(habit.id);
-
-        // Cancel previous if any
-        try {
-          await LocalNotifications.cancel({ notifications: [{ id: numericId }] });
-          await LocalNotifications.removeDeliveredNotificationsById({ ids: [numericId] });
-        } catch (_) {}
-
-        await LocalNotifications.schedule({
-          notifications: [
-            {
-              id: numericId,
-              title,
-              body,
-              channelId: 'habit-reminders',
-              schedule: { at: new Date(Date.now() + 100) },
-              extra: { habitId: habit.id, date: todayStr },
-            },
-          ],
-        });
-      } catch (err) {
-        console.warn('[HabitNotification] Native notification dispatch error:', err);
-      }
-    } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      // 2. Web Browser Notification
+    if (!Capacitor.isNativePlatform() && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       try {
         this.closeWebNotification(habit.id);
-
         const notif = new Notification(title, {
           body,
           icon: '/favicon.ico',
           tag: `habit-reminder-${habit.id}`,
           requireInteraction: true,
         });
-
         notif.onclick = () => {
-          try {
-            window.focus();
-          } catch (_) {}
+          try { window.focus(); } catch (_) {}
           notif.close();
-          window.dispatchEvent(
-            new CustomEvent('habit_reminder_click', {
-              detail: { habitId: habit.id, date: todayStr },
-            })
-          );
+          window.dispatchEvent(new CustomEvent('habit_reminder_click', { detail: { habitId: habit.id, date: todayStr } }));
         };
-
         this.activeWebNotifications.set(habit.id, notif);
       } catch (err) {
         console.warn('[HabitNotification] Web notification dispatch error:', err);
       }
     }
 
-    // 3. In-App Floating Banner
     if (!this.activeBanners.some((b) => b.habitId === habit.id)) {
       this.activeBanners.push({
         habitId: habit.id,
         habitName: habit.name,
         symbol: habit.symbol,
         timeText,
-        reminderTime: reminder?.reminderTime || '',
+        reminderTime: habit.reminder?.reminderTime || '',
       });
       this.notifyListeners();
     }
   }
 
-  // Close active system notification for a habit
   public async closeNotification(habitId: string) {
     if (Capacitor.isNativePlatform()) {
       try {
-        const numericId = this.getNumericId(habitId);
-        await LocalNotifications.cancel({ notifications: [{ id: numericId }] });
-        await LocalNotifications.removeDeliveredNotificationsById({ ids: [numericId] });
+        const todayScheduleId = getScheduleId(habitId, new Date().getDay());
+        const baseId = getNumericId(habitId);
+        await LocalNotifications.cancel({ notifications: [{ id: todayScheduleId }, { id: baseId }] });
+        await LocalNotifications.removeDeliveredNotificationsById({ ids: [todayScheduleId, baseId] });
       } catch (e) {
         console.warn('[HabitNotification] Native cancel error:', e);
       }
@@ -332,75 +286,71 @@ class HabitNotificationService {
   private closeWebNotification(habitId: string) {
     const active = this.activeWebNotifications.get(habitId);
     if (active) {
-      try {
-        active.close();
-      } catch (_) {}
+      try { active.close(); } catch (_) {}
       this.activeWebNotifications.delete(habitId);
     }
   }
 
-  // Called immediately when user completes a check-in for today
-  // 【核心功能】：如果我完成了当前习惯打卡通知栏消失；如果我提前完成了打卡即使到提醒时间也不要提醒
   public async onHabitCompletedToday(habitId: string) {
-    const todayStr = this.getLocalDateString(new Date());
-    // 1. Close system notification immediately from Android status bar / browser
+    const todayStr = getLocalDateString(new Date());
     await this.closeNotification(habitId);
-
-    // 2. Remove in-app banner
     this.dismissBanner(habitId);
+    localStorage.setItem(`habit_alert_${habitId}_${todayStr}`, 'early_completed');
 
-    // 3. Mark alert key so even if reminder time hasn't arrived yet, it will never fire today
-    const todayAlertKey = `habit_alert_${habitId}_${todayStr}`;
-    localStorage.setItem(todayAlertKey, 'early_completed');
+    if (Capacitor.isNativePlatform()) {
+      await this.syncAllHabitSchedules();
+    }
   }
 
-  // Immediate test notification for the user to preview in notification bar
-  public async testNotification(habit: CheckInType): Promise<boolean> {
-    if (!this.isSupported()) {
-      return false;
+  public async cancelHabitSchedules(habitId: string) {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const idsToCancel = [0, 1, 2, 3, 4, 5, 6].map((day) => ({ id: getScheduleId(habitId, day) }));
+        idsToCancel.push({ id: getNumericId(habitId) });
+        await LocalNotifications.cancel({ notifications: idsToCancel });
+        await LocalNotifications.removeDeliveredNotificationsById({ ids: idsToCancel.map((n) => n.id) });
+      } catch (e) {
+        console.warn('[HabitNotification] cancelHabitSchedules error:', e);
+      }
     }
+    await this.closeNotification(habitId);
+    this.dismissBanner(habitId);
+  }
 
-    const timeText =
-      habit.reminder?.targetStartTime && habit.reminder?.targetEndTime
-        ? `${habit.reminder.targetStartTime} ~ ${habit.reminder.targetEndTime}`
-        : '21:00 ~ 22:00';
-
+  public async testNotification(habit: CheckInType): Promise<boolean> {
+    if (!this.isSupported()) return false;
+    const { timeText } = getHabitNotificationContent(habit);
     const title = `⏰ [测试] 习惯打卡提醒：${habit.symbol} ${habit.name}`;
-    const body = `计划时段：${timeText}。当您在 App 中点击打卡后，此通知栏提醒将自动消失！`;
+    const body = `计划时段：${timeText}。系统底层闹钟已联动，打卡完成后通知栏提醒将自动清除！`;
 
     if (Capacitor.isNativePlatform()) {
       try {
         await this.initAndroidChannel();
         const perm = await this.getPermissionAsync();
-        if (perm !== 'granted') {
-          const req = await this.requestPermission();
-          if (req !== 'granted') return false;
-        }
+        if (perm !== 'granted' && (await this.requestPermission()) !== 'granted') return false;
 
-        const numericId = this.getNumericId(habit.id);
+        const testId = getNumericId(habit.id);
         await LocalNotifications.schedule({
           notifications: [
             {
-              id: numericId,
+              id: testId,
               title,
               body,
               channelId: 'habit-reminders',
               schedule: { at: new Date(Date.now() + 200) },
-              extra: { habitId: habit.id, date: this.getLocalDateString(new Date()) },
+              extra: { habitId: habit.id, date: getLocalDateString(new Date()) },
             },
           ],
         });
         return true;
-      } catch (e: any) {
+      } catch (e) {
         console.warn('[HabitNotification] Native test error:', e);
         return false;
       }
     }
 
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission !== 'granted') {
-        return false;
-      }
+      if (Notification.permission !== 'granted') return false;
       try {
         const notif = new Notification(title, {
           body,
@@ -410,20 +360,12 @@ class HabitNotificationService {
         });
         this.activeWebNotifications.set(habit.id, notif);
         return true;
-      } catch (e: any) {
+      } catch (e) {
         console.warn('[HabitNotification] Web test error:', e);
         return false;
       }
     }
-
     return false;
-  }
-
-  private getLocalDateString(d: Date): string {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 }
 

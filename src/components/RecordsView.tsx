@@ -1,6 +1,6 @@
 // src/components/RecordsView.tsx
 import React, { useState, useMemo } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Sparkles, BookOpen, Camera, FileText } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Memory, Note, Photo } from '../types';
 import { fuzzySearch } from '../utils/fuzzySearch';
@@ -10,6 +10,7 @@ import { PhotoGrid } from './records/PhotoGrid';
 import { DeleteConfirmationModal } from './records/DeleteConfirmationModal';
 import { getThemeColors } from '../utils/themeStyles';
 import { ListPaginationControl } from './ListPaginationControl';
+import { RecordsFootprintHeader } from './records/RecordsFootprintHeader';
 
 interface RecordsViewProps {
   onOpenMemoryCreate: () => void;
@@ -30,11 +31,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 }) => {
   const {
     memories,
-    deleteMemory,
     notes,
-    deleteNote,
     photos,
-    deletePhoto,
     offloadItem,
     permanentDeleteItem,
     theme,
@@ -42,7 +40,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
   const themeColors = getThemeColors(theme);
 
-  const [activeSubTab, setActiveSubTab] = useState<'all' | 'memories' | 'notes'>('all');
+  const [activeSubTab, setActiveSubTab] = useState<'all' | 'memories' | 'photos' | 'notes'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
@@ -58,7 +56,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
   // Dual-track deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: 'memory' | 'note';
+    type: 'memory' | 'note' | 'photo';
     id: string;
     title: string;
     description?: string;
@@ -67,9 +65,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   // All unique tags
   const allTags = useMemo(() => {
     const set = new Set<string>();
-    memories.forEach((m) => m.tags.forEach((t) => set.add(t)));
-    notes.forEach((n) => n.tags.forEach((t) => set.add(t)));
-    photos.forEach((p) => p.tags.forEach((t) => set.add(t)));
+    memories.forEach((m) => (m.tags || []).forEach((t) => set.add(t)));
+    notes.forEach((n) => (n.tags || []).forEach((t) => set.add(t)));
+    photos.forEach((p) => (p.tags || []).forEach((t) => set.add(t)));
     return Array.from(set);
   }, [memories, notes, photos]);
 
@@ -77,13 +75,13 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const filteredMemories: Memory[] = useMemo(() => {
     let list = memories;
     if (selectedTag) {
-      list = list.filter((m) => m.tags.includes(selectedTag));
+      list = list.filter((m) => (m.tags || []).includes(selectedTag));
     }
     if (searchQuery.trim()) {
       return fuzzySearch<Memory>({
         items: list,
         query: searchQuery,
-        getTexts: (m: Memory) => [m.title || '', m.content, m.aiSummary || '', ...m.tags],
+        getTexts: (m: Memory) => [m.title || '', m.content, m.aiSummary || '', ...(m.tags || [])],
       }).map((r) => r.item);
     }
     return list;
@@ -93,13 +91,13 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const filteredNotes: Note[] = useMemo(() => {
     let list = notes;
     if (selectedTag) {
-      list = list.filter((n) => n.tags.includes(selectedTag));
+      list = list.filter((n) => (n.tags || []).includes(selectedTag));
     }
     if (searchQuery.trim()) {
       return fuzzySearch<Note>({
         items: list,
         query: searchQuery,
-        getTexts: (n: Note) => [n.title, n.content, ...n.tags],
+        getTexts: (n: Note) => [n.title, n.content, ...(n.tags || [])],
       }).map((r) => r.item);
     }
     return [...list].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
@@ -109,13 +107,13 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const filteredPhotos: Photo[] = useMemo(() => {
     let list = photos;
     if (selectedTag) {
-      list = list.filter((p) => p.tags.includes(selectedTag));
+      list = list.filter((p) => (p.tags || []).includes(selectedTag));
     }
     if (searchQuery.trim()) {
       return fuzzySearch<Photo>({
         items: list,
         query: searchQuery,
-        getTexts: (p: Photo) => [p.aiSummary || '', p.locationName || '', ...p.tags],
+        getTexts: (p: Photo) => [p.aiSummary || '', p.locationName || '', ...(p.tags || [])],
       }).map((r) => r.item);
     }
     return list;
@@ -123,12 +121,23 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
   return (
     <div className="space-y-4 pb-20">
-      {/* Sub Tabs */}
-      <div className="flex items-center justify-between">
-        <div className={`flex gap-1 p-1 ${themeColors.segmentBg} rounded-2xl`}>
+      {/* Top Life Footprint Summary Card */}
+      <RecordsFootprintHeader
+        memoriesCount={memories.length}
+        notesCount={notes.length}
+        photosCount={photos.length}
+        themeColors={themeColors}
+        onOpenMemoryCreate={onOpenMemoryCreate}
+        onOpenNoteCreate={onOpenNoteCreate}
+      />
+
+      {/* Segmented Sub Tabs */}
+      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className={`flex gap-1 p-1 ${themeColors.segmentBg} rounded-2xl shrink-0`}>
           {[
             { id: 'all', label: '全部' },
-            { id: 'memories', label: `记录 (${memories.length})` },
+            { id: 'memories', label: `日记 (${memories.length})` },
+            { id: 'photos', label: `相片 (${photos.length})` },
             { id: 'notes', label: `便签 (${notes.length})` },
           ].map((tab) => (
             <button
@@ -144,52 +153,29 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             </button>
           ))}
         </div>
-
-        {/* Action Button */}
-        <div className="flex gap-1.5">
-          {activeSubTab === 'notes' ? (
-            <button
-              onClick={onOpenNoteCreate}
-              className={`flex items-center gap-1.5 px-3 py-1.5 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl shadow-xs transition-all`}
-              title="新建便签"
-            >
-              <Plus className="w-3.5 h-3.5 text-white" />
-              <span>新建便签</span>
-            </button>
-          ) : (
-            <button
-              onClick={onOpenMemoryCreate}
-              className={`flex items-center gap-1.5 px-3 py-1.5 ${themeColors.actionBtn} text-white text-xs font-medium rounded-xl shadow-xs transition-all`}
-              title="写记录"
-            >
-              <Plus className="w-3.5 h-3.5 text-white" />
-              <span>写记录</span>
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Fuzzy Search Bar */}
       <div className="relative">
         <input
           type="text"
-          placeholder="模糊搜索记录内容、标题、标签或地点..."
+          placeholder="搜索日记内容、便签备忘、相片说明、标签或地点..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full text-xs py-2 px-3 pl-8 ${themeColors.cardBg} border ${themeColors.cardBorder} rounded-xl focus:outline-none ${themeColors.focusRing} shadow-xs ${themeColors.textMain}`}
+          className={`w-full text-xs py-2 px-3 pl-8.5 ${themeColors.cardBg} border ${themeColors.cardBorder} rounded-xl focus:outline-none ${themeColors.focusRing} shadow-xs ${themeColors.textMain}`}
         />
-        <Search className={`w-3.5 h-3.5 ${themeColors.textSub} absolute left-2.5 top-3`} />
+        <Search className={`w-3.5 h-3.5 ${themeColors.textSub} absolute left-3 top-2.5`} />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className={`text-xs ${themeColors.textSub} hover:${themeColors.textMain} absolute right-3 top-2`}
+            className={`text-xs ${themeColors.textSub} hover:${themeColors.textMain} absolute right-3 top-2 px-1`}
           >
             ×
           </button>
         )}
       </div>
 
-      {/* Tag Chips */}
+      {/* Tag Filter Chips */}
       {allTags.length > 0 && (
         <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
           <button
@@ -219,21 +205,45 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       )}
 
       {/* Content Stream */}
-      <div className="space-y-3">
-        {activeSubTab === 'notes' && filteredNotes.length === 0 && (
-          <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center text-xs ${themeColors.textSub}`}>
-            暂无便签备忘，点击右上角「新建便签」快速记下灵感
-          </div>
+      <div className="space-y-4">
+        {/* Photo Gallery Stream */}
+        {(activeSubTab === 'all' || activeSubTab === 'photos') && filteredPhotos.length > 0 && (
+          <PhotoGrid
+            photos={filteredPhotos}
+            activeSubTab={activeSubTab}
+            onViewAll={() => setActiveSubTab('photos')}
+            onEdit={onOpenPhotoEdit}
+            onDelete={(id) => {
+              const p = photos.find((x) => x.id === id);
+              setDeleteTarget({
+                type: 'photo',
+                id,
+                title: '删除生活相片',
+                description: p?.aiSummary || '所选照片',
+              });
+            }}
+          />
         )}
 
+        {/* Sticky Notes Section */}
         {(activeSubTab === 'all' || activeSubTab === 'notes') && filteredNotes.length > 0 && (
           <div className="space-y-2">
             {activeSubTab === 'all' && (
-              <span className={`text-xs font-semibold ${themeColors.textMain} block px-1`}>
-                便签备忘 ({filteredNotes.length})
-              </span>
+              <div className="flex items-center justify-between px-1">
+                <span className={`text-xs font-semibold ${themeColors.textMain} flex items-center gap-1`}>
+                  <FileText className="w-3.5 h-3.5 text-amber-500" />
+                  <span>灵感便签墙 ({filteredNotes.length})</span>
+                </span>
+                <button
+                  onClick={() => setActiveSubTab('notes')}
+                  className={`text-[11px] ${themeColors.primaryText} hover:underline font-medium`}
+                >
+                  查看全部
+                </button>
+              </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {filteredNotes.slice(0, notesVisibleCount).map((note) => (
                 <NoteCard
                   key={note.id}
@@ -262,17 +272,45 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           </div>
         )}
 
+        {/* Empty Note State */}
+        {activeSubTab === 'notes' && filteredNotes.length === 0 && (
+          <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center space-y-2`}>
+            <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+            <div className={`text-xs font-medium ${themeColors.textMain}`}>暂无便签备忘</div>
+            <p className={`text-[11px] ${themeColors.textSub}`}>
+              点击上方「便签」快速记下灵感碎片
+            </p>
+          </div>
+        )}
+
+        {/* Empty Photo State */}
+        {activeSubTab === 'photos' && filteredPhotos.length === 0 && (
+          <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center space-y-2`}>
+            <Camera className="w-8 h-8 text-slate-300 mx-auto" />
+            <div className={`text-xs font-medium ${themeColors.textMain}`}>暂无生活相片</div>
+            <p className={`text-[11px] ${themeColors.textSub}`}>
+              在写日记记录时上传配图，即可自动归档在此
+            </p>
+          </div>
+        )}
+
+        {/* Memories Stream */}
         {(activeSubTab === 'all' || activeSubTab === 'memories') && (
           <div className="space-y-2.5">
             {activeSubTab === 'all' && (
-              <span className={`text-xs font-semibold ${themeColors.textMain} block px-1`}>
-                日记与事实记录 ({filteredMemories.length})
+              <span className={`text-xs font-semibold ${themeColors.textMain} flex items-center gap-1 px-1`}>
+                <BookOpen className="w-3.5 h-3.5 text-sky-500" />
+                <span>日记时光流 ({filteredMemories.length})</span>
               </span>
             )}
 
             {filteredMemories.length === 0 ? (
-              <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center text-xs ${themeColors.textSub}`}>
-                暂无匹配的记录内容
+              <div className={`${themeColors.cardBg} p-8 rounded-2xl border ${themeColors.cardBorder} text-center space-y-2`}>
+                <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+                <div className={`text-xs font-medium ${themeColors.textMain}`}>暂无日记记录</div>
+                <p className={`text-[11px] ${themeColors.textSub}`}>
+                  点击上方「写记录」沉淀今天的客观事实
+                </p>
               </div>
             ) : (
               <>
@@ -285,7 +323,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                       setDeleteTarget({
                         type: 'memory',
                         id,
-                        title: '删除日记/事实记录',
+                        title: '删除日记记录',
                         description: mem.title ? `${mem.title} - ${mem.content}` : mem.content,
                       });
                     }}
@@ -320,6 +358,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               note: 'notes',
             } as const;
             offloadItem(collectionMap[deleteTarget.type], deleteTarget.id);
+            setDeleteTarget(null);
           }
         }}
         onPermanentDelete={() => {
@@ -330,6 +369,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               note: 'notes',
             } as const;
             permanentDeleteItem(collectionMap[deleteTarget.type], deleteTarget.id);
+            setDeleteTarget(null);
           }
         }}
       />
